@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SmartДом — умный дом и баня на WirenBoard</title>
+
+  <meta name="description" content="Автоматизация дома и бани под ключ: щиты автоматики, свет, климат, вода и безопасность. Основа — WirenBoard. Интеграция с Алисой. Проект, сборка, монтаж, поддержка." />
+<meta property="og:image" content="https://xn--b1aeoaoceff6ao2h.xn--p1ai/meta.png?v=2">
+<meta property="og:url" content="https://xn--b1aeoaoceff6ao2h.xn--p1ai/">
+<meta property="og:type" content="website">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./styles.css" />
+  <script defer src="./script.js"></script>
+</head>
+
+<body>
+    <div id="top-sentinel" aria-hidden="true"></div>
+
+  <div class="wrap" id="top">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="container">
+        <div class="headRow">
+          <div class="brand">
+            <div class="brandMark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
+                      stroke="rgba(0,230,255,.95)" stroke-width="1.6" />
+              </svg>
+            </div>
+            <div>SmartДом</div>
+          </div>
+
+          <nav class="nav" aria-label="Навигация">
+            <a class="active" href="#top">Главная</a>
+            <a href="#services">Услуги</a>
+            <a href="#why-us">Преимущества</a>
+            <a href="#cta">Связь</a>
+            <a href="#contacts">Контакты</a>
+          </nav>
+
+          <div class="headRight">
+  <a class="phone" href="tel:+79939706073">+7&nbsp;(993)&nbsp;970-60-73</a>
+
+  <a class="btn btnPrimary btnSmall" href="https://t.me/glarionenko" target="_blank" rel="noopener">
+    <svg class="btnIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M21.8 4.6 18.7 19c-.2 1-1 1.2-1.8.7l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.4-5.3 9.7-8.8c.4-.4-.1-.6-.7-.2l-12 7.6-5.2-1.6c-1.1-.3-1.1-1.1.2-1.6l20.2-7.8c.9-.3 1.7.2 1.4 1.6Z"
+            fill="#05121a"/>
+    </svg>
+    Telegram
+  </a>
+</div>
+
+        </div>
+      </div>
+    </header>
+
+    <main>
+
+      <!-- HERO (визуал как в референсе, данные — ваши) -->
+ <!-- Hero (как в референсе, меняем только 4 плашки справа и кнопку "Узнать стоимость" -> "Услуги") -->
+<section class="hero">
+  <div class="heroBg" aria-hidden="true">
+  <div class="heroBgLayer heroBgFull"></div>
+  <div class="heroBgLayer heroBgHalf"></div>
+  <div class="heroBgLayer heroBgClosed"></div>
+</div>
+
+
+  <div class="container">
+    <div class="heroGrid">
+      <div>
+        <button class="pill pillBtn" type="button" id="alicaToggle" aria-pressed="false">
+  <span class="dot"></span>
+  <span class="pillText">Алиса, я дома</span>
+</button>
+
+
+        <h1>
+          Ваш дом станет<br>
+          <span class="gradWord">умнее</span>
+        </h1>
+
+        <p class="lead">
+          Комплексная автоматизация умного дома. Проектирование, установка и обслуживание систем
+          освещения, климата, безопасности и мультимедиа.
+        </p>
+
+        <div class="ctaRow">
+          <a class="btn btnPrimary" href="#cta">
+            Получить консультацию
+            <svg class="arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12h12" stroke="#05121a" stroke-width="2" stroke-linecap="round"/>
+              <path d="M13 6l6 6-6 6" stroke="#05121a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+
+          <!-- ИЗМЕНЕНО: было "Узнать стоимость" (#pricing) -->
+          <a class="btn btnOutline" href="#services">Услуги</a>
+        </div>
+
+        <div class="chips" aria-label="Разделы">
+          <span class="chip">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 2a7 7 0 0 1 3 13.3V17a3 3 0 0 1-6 0v-1.7A7 7 0 0 1 12 2Z" stroke="rgba(0,230,255,.95)" stroke-width="1.6"/>
+              <path d="M10 21h4" stroke="rgba(255,255,255,.7)" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            Освещение
+          </span>
+
+          <span class="chip">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 2v20" stroke="rgba(0,230,255,.95)" stroke-width="1.6" stroke-linecap="round"/>
+              <path d="M8 6c2.5-2 5.5-2 8 0" stroke="rgba(255,255,255,.7)" stroke-width="1.6" stroke-linecap="round"/>
+              <path d="M8 18c2.5 2 5.5 2 8 0" stroke="rgba(255,255,255,.7)" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            Климат
+          </span>
+
+          <span class="chip">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 3l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V7l8-4Z" stroke="rgba(0,230,255,.95)" stroke-width="1.6"/>
+            </svg>
+            Безопасность
+          </span>
+
+          <span class="chip">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 7h16v10H4V7Z" stroke="rgba(0,230,255,.95)" stroke-width="1.6"/>
+              <path d="M9 20h6" stroke="rgba(255,255,255,.7)" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            Мультимедиа
+          </span>
+        </div>
+      </div>
+
+      <!-- ИЗМЕНЕНО: только содержимое 4 плашек -->
+      <div class="statsGrid" aria-label="Ключевые показатели">
+        <div class="stat">
+          <div class="num">5+ лет</div>
+          <div class="lbl">опыт интеграций</div>
+        </div>
+        <div class="stat">
+          <div class="num">Полный цикл</div>
+          <div class="lbl">от ТЗ до запуска</div>
+        </div>
+        <div class="stat">
+          <div class="num">Стенд-тест</div>
+          <div class="lbl">проверяем до монтажа</div>
+        </div>
+        <div class="stat">
+          <div class="num">Гарантия</div>
+          <div class="lbl">мы с вами и после завершения</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+      <!-- SERVICES -->
+      <section id="services" class="services">
+        <div class="container">
+          <div class="sectionHead">
+            <div>
+              <h2><span class="gradient">Наши услуги</span></h2>
+              <p class="subtitle">
+                Щиты автоматизации, умные бани, управление светом и климатом — всё на базе <b>WirenBoard</b> (и не только).
+              </p>
+            </div>
+          </div>
+
+          <!-- Плашки как в референсе (wide cards + мини-списки) -->
+          <div class=" serviceGridWide">
+            <article class="serviceCard serviceCardWide">
+              <h3>Щиты автоматизации WirenBoard</h3>
+              <p>Сердце системы — грамотно спроектированный и собранный щит автоматики.</p>
+              <ul class="miniList">
+                <li>Подбор компонентов под задачи</li>
+                <li>Сборка, маркировка, аккуратная укладка</li>
+                <li>Стендовые испытания перед выездом</li>
+                <li>Документация: схемы, ведомость</li>
+                <li>Защита, запас по мощности, сервисопригодность</li>
+              </ul>
+            </article>
+
+            <article class="serviceCard serviceCardWide">
+              <h3>Автоматизация бани и сауны</h3>
+              <p>Удобство и безопасность: прогрев, вентиляция, свет, контроль влажности.</p>
+              <ul class="miniList">
+                <li>Безопасное управление нагрузками</li>
+                <li>Вентиляция и контроль влажности</li>
+                <li>Тёплые полы по зонам</li>
+                <li>Сценарии «Прогрев / Парение / Отдых»</li>
+                <li>Уведомления и мониторинг</li>
+              </ul>
+            </article>
+
+            <article class="serviceCard serviceCardWide">
+              <h3>Освещение и сценарии</h3>
+              <p>Свет по группам, датчикам, расписанию или одной кнопкой.</p>
+              <ul class="miniList">
+                <li>Группы и диммирование (при необходимости)</li>
+                <li>Датчики присутствия и «умные проходы»</li>
+                <li>Сценарии: «Ночь», «Уход», «Кино»</li>
+                <li>Кнопки/панели, логика «как привыкли»</li>
+                <li>Интеграция в общую систему</li>
+              </ul>
+            </article>
+
+            <article class="serviceCard serviceCardWide">
+              <h3>Климат и вентиляция</h3>
+              <p>Комфорт по зонам: температура, воздух и экономия на отоплении.</p>
+              <ul class="miniList">
+                <li>Тёплые полы/радиаторы по зонам</li>
+                <li>Приточка/вытяжка (опция)</li>
+                <li>CO₂ и влажность (опция)</li>
+                <li>Логика по датчикам/расписаниям</li>
+                <li>Защита от перегрева/заморозки</li>
+              </ul>
+            </article>
+
+            <article class="serviceCard serviceCardWide">
+              <h3>Вода и безопасность</h3>
+              <p>Защита от протечек, насосы/бойлер, аварийные сценарии.</p>
+              <ul class="miniList">
+                <li>Датчики протечки + автоперекрытие</li>
+                <li>Насосы, бойлер, аварийные отключения</li>
+                <li>Уведомления на телефон</li>
+                <li>Журнал событий</li>
+                <li>Расширение под объект</li>
+              </ul>
+            </article>
+
+            <article class="serviceCard serviceCardWide">
+              <h3>Интеграции и диспетчеризация</h3>
+              <p>Удалённый доступ, мониторинг, и голосовое управление.</p>
+              <ul class="miniList">
+                <li>Веб-интерфейс WirenBoard</li>
+                <li>Безопасный удалённый доступ (VPN)</li>
+                <li>Home Assistant (опция)</li>
+                <li><b>Интеграция с Алисой</b> (опция)</li>
+                <li>Алерты и обслуживание</li>
+              </ul>
+            </article>
+          </div>
+
+          <!-- Кнопки перенесены ВНИЗ секции -->
+          <div class="sectionFoot">
+            <a class="btn btnPrimary" href="tel:+79939706073">Позвонить</a>
+            <a class="btn btnOutline" href="https://t.me/glarionenko" target="_blank" rel="noopener">Написать в Telegram</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- WHY (визуал — референс: плашки + заголовок) -->
+      <section id="why-us" class="whyUs">
+        <div class="container">
+          <div class="whyMini">
+              <div class="whyMiniHead">
+                <h2>Почему выбирают <span class="gradient">нас</span></h2>
+                <p class="subtitle">Небольшая команда, которая делает качественно и по-честному.</p>
+              </div>
+            
+
+            <div class="whyMiniGrid">
+              <div class="whyCard">
+                <h3>Инженерно и безопасно</h3>
+                <p>Расчёт нагрузок, защитные схемы, аккуратная силовая часть и слабые токи.</p>
+              </div>
+              <div class="whyCard">
+                <h3>Стенд-тест перед монтажом</h3>
+                <p>Проверяем логику и коммутацию на стенде — меньше сюрпризов на объекте.</p>
+              </div>
+              <div class="whyCard">
+                <h3>Понятная логика</h3>
+                <p>Сценарии «как привыкли»: без магии, с предсказуемым поведением системы.</p>
+              </div>
+              <div class="whyCard">
+                <h3>Документация и поддержка</h3>
+                <p>Схемы, ведомость, описания. После сдачи не исчезаем — помогаем и развиваем.</p>
+              </div>
+            </div>
+
+            <!-- Кнопки ВНИЗУ блока -->
+            <div class="sectionFoot">
+              <a class="btn btnPrimary" href="tel:+79939706073">Позвонить</a>
+              <a class="btn btnOutline" href="https://t.me/glarionenko" target="_blank" rel="noopener">Написать в Telegram</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CTA (остался как в референсе) -->
+      <section class="ctaSection" id="cta">
+        <div class="container">
+          <div class="ctaCard">
+            <h2>Готовы обсудить проект?</h2>
+            <p class="subtitle">Расскажите об объекте — подготовим предварительный расчёт и ответим на вопросы.</p>
+
+            <div class="ctaRow">
+              <a class="btn btnPrimary btnBig" href="tel:+79939706073">
+                Позвонить
+                <svg class="arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12h12" stroke="#05121a" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M13 6l6 6-6 6" stroke="#05121a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </a>
+
+              <a class="btn btnOutline btnBig" href="https://t.me/glarionenko" target="_blank" rel="noopener">
+                Написать в Telegram
+              </a>
+            </div>
+
+            <div class="ctaPhone">
+              или позвоните:
+              <a href="tel:+79939706073">+7&nbsp;(993)&nbsp;970-60-73</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONTACTS (минимально, как визитка) -->
+      <section id="contacts" class="contacts">
+        <div class="container">
+          <div class="contactsGrid contactsGridSingle">
+            <div class="contactsLeft">
+              <h2>Контакты</h2>
+
+              <div class="contactItem">
+                <div class="contactIcon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M6.6 10.8c1.3 2.6 3.9 5.3 6.6 6.6l2.2-2.2c.3-.3.8-.4 1.2-.2 1.3.5 2.7.8 4.2.8.6 0 1 .4 1 1V21c0 .6-.4 1-1 1C9.4 22 2 14.6 2 5c0-.6.4-1 1-1h3.2c.6 0 1 .4 1 1 0 1.5.3 2.9.8 4.2.1.4 0 .9-.2 1.2L6.6 10.8Z"
+                          stroke="rgba(0,230,255,.95)" stroke-width="1.6"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="contactLabel">Телефон</div>
+                  <a class="contactValue" href="tel:+79939706073">+7 (993) 970-60-73</a>
+                </div>
+              </div>
+
+              <div class="contactItem">
+                <div class="contactIcon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10Z"
+                          stroke="rgba(0,230,255,.95)" stroke-width="1.6"/>
+                    <path d="M7 12.2 17.5 7.6l-2.3 10.9-3.7-3.3-2.2 2v-3.3L7 12.2Z"
+                          stroke="rgba(0,230,255,.75)" stroke-width="1.6" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="contactLabel">Telegram</div>
+                  <a class="contactValue" href="https://t.me/glarionenko" target="_blank" rel="noopener">@glarionenko</a>
+                </div>
+              </div>
+
+              <div class="hintCard" style="margin-top: 18px;">
+                <h3>Что написать в первом сообщении</h3>
+                <ul class="hintList">
+                  <li>Тип объекта: дом / баня / квартира</li>
+                  <li>Площадь (примерно)</li>
+                  <li>Что автоматизируем: свет / климат / вода / защита</li>
+                  <li>Есть ли проект электрики или ремонт уже сделан</li>
+                  <li>Нужна ли интеграция с <b>Алисой</b></li>
+                </ul>
+              </div>
+
+              <!-- Кнопки внизу секции контактов -->
+              <div class="sectionFoot sectionFootLeft">
+                <a class="btn btnPrimary btnBig" href="tel:+79939706073">Позвонить</a>
+                <a class="btn btnOutline btnBig" href="https://t.me/glarionenko" target="_blank" rel="noopener">Написать в Telegram</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer footerMinimal">
+        <div class="container footerBottom">
+          <p>©&nbsp;2026 SmartДом. Все права защищены.</p>
+          <p><a href="#">Политика конфиденциальности</a></p>
+        </div>
+      </footer>
+
+    </main>
+  </div>
+</body>
+</html>
