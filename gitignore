@@ -1,0 +1,23 @@
+# ОС
+.DS_Store
+Thumbs.db
+
+# Зависимости
+node_modules/
+vendor/
+.venv/
+
+# IDE и редакторы
+.idea/
+.vscode/
+*.swp
+
+# Сборка и логи
+build/
+dist/
+*.log
+*.tmp
+
+# Конфиденциальные данные
+.env
+.env.local
