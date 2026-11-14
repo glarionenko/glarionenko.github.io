@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#030405" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>DarkMaze2D — слуховой лабиринт</title>
+  <!-- Official Telegram Mini Apps bridge; site remains playable outside Telegram. -->
+  <script src="https://telegram.org/js/telegram-web-app.js?65"></script>
   <style>
     :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       --ink:#e7ebed; --muted:#777f87; --soft:#1b2025; --edge:#24292d; }
@@ -87,9 +89,9 @@
       <div class="eyebrow">АУДИОИГРА · ПРОТОТИП 01</div>
       <h1>DarkMaze2D</h1>
       <div class="lead">Ты в полной темноте. Почувствуй ширину коридоров, считай шаги, ищи выход по звуку.</div>
-      <div class="detail">Коснись экрана в любой точке и веди палец: там появится джойстик. Движение только по четырём направлениям. У стен — удар и вибрация, если устройство её поддерживает. Маяки слышны только поблизости и по прямой видимости.</div>
+      <div class="detail">Коснись экрана в любой точке и веди палец: там появится джойстик. Движение только по четырём направлениям. У стен — звуковой удар; в Telegram на телефоне добавится тактильный отклик. Маяки слышны только поблизости и по прямой видимости.</div>
       <button class="primary" id="startBtn" type="button">Начать в наушниках</button>
-      <div class="hint">На компьютере: WASD / стрелки. Карта по умолчанию скрыта.<br>Звук браузер разрешит после нажатия кнопки.</div>
+      <div class="hint">На компьютере: WASD / стрелки. Карта по умолчанию скрыта.<br>Звук браузер разрешит после нажатия кнопки.<span id="hapticInfo" style="display:block;margin-top:7px"></span></div>
     </div>
   </div>
   <div class="overlay hidden" id="helpOverlay">
@@ -114,6 +116,38 @@
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
+  // This JS bridge only works when the page is launched as a Telegram Mini App
+  // (from a bot's Mini App/menu button), not via a normal chat URL in Safari.
+  const tg=window.Telegram && window.Telegram.WebApp;
+  const inTelegram=!!(tg && typeof tg.platform==='string' &&
+    tg.platform!=='' && tg.platform!=='unknown');
+  if(inTelegram){
+    try {
+      tg.ready();
+      tg.expand();
+      if(tg.isVersionAtLeast && tg.isVersionAtLeast('7.7') && tg.disableVerticalSwipes)
+        tg.disableVerticalSwipes();
+      if(tg.setBackgroundColor)tg.setBackgroundColor('#030405');
+    } catch(err) { console.warn('Telegram Mini App initialization:',err); }
+  }
+  function haptic(kind){
+    if(inTelegram && tg.HapticFeedback){
+      try {
+        if(kind==='wall')tg.HapticFeedback.impactOccurred('rigid');
+        else if(kind==='win')tg.HapticFeedback.notificationOccurred('success');
+        return true;
+      } catch(err) { console.warn('Telegram haptic:',err); }
+    }
+    // Android/browser fallback. iOS Safari doesn't implement navigator.vibrate.
+    if(kind==='wall' && typeof navigator.vibrate==='function'){
+      try {return !!navigator.vibrate(28);}catch(_){}
+    }
+    return false;
+  }
+  const hapticInfo=$('hapticInfo');
+  if(hapticInfo)hapticInfo.textContent=inTelegram
+    ? 'Telegram Mini App: тактильный отклик при столкновении'
+    : 'На iPhone вибрация доступна при запуске через бота Telegram';
   const el = {
     field:$('field'), map:$('map'), joy:$('joy'),knob:$('knob'),
     start:$('startOverlay'),help:$('helpOverlay'),win:$('winOverlay'),
@@ -248,8 +282,7 @@
     if(now-lastCollision<550)return;
     lastCollision=now;
     audio.bump();
-    // iOS Safari normally lacks navigator.vibrate; a sound always remains as fallback.
-    try { if(typeof navigator.vibrate==='function')navigator.vibrate(28); } catch(_) {}
+    haptic('wall'); // Telegram rigid impact, or browser vibration where supported
   }
   function reachedExit(){
     const e=maze.exit;
@@ -264,6 +297,7 @@
     releaseTouch();
     audio.stopBeacons();
     audio.victory();
+    haptic('win');
     el.winStats.textContent=`Лабиринт ${stage} · ${steps} шагов · ${Math.round(elapsed)} сек. Настоящие шаги — это путь, а не проигрываемая по таймеру анимация.`;
     el.win.classList.remove('hidden');
   }
