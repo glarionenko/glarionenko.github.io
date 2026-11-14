@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>DarkMaze3D v2 — звуковой лабиринт</title>
+  <style>
+    :root {color-scheme:dark; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; --blue:#70bbf8; --orange:#edc885; --muted:#8999aa;}
+    *, *::before, *::after {box-sizing:border-box;}
+    html,body {margin:0; padding:0; width:100%;height:100%;overflow:hidden;background:#000;color:#f2f4f8;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+    body {height:100dvh;}
+    #app {position:relative;width:100%;height:100%;height:100dvh;overflow:hidden;background:radial-gradient(ellipse at 50% 44%,#090e14 0%,#030405 42%,#000 80%);}
+    .zone {position:absolute;left:0;width:100%;height:50%;touch-action:none;overflow:hidden;cursor:crosshair;}
+    #moveZone {top:0;}
+    #lookZone {bottom:0;border-top:1px solid #17212a;}
+    .zoneLabel {position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;color:#566372;letter-spacing:.15em;font-weight:700;font-size:clamp(11px,2.7vw,14px);transition:opacity .16s;white-space:nowrap;}
+    .zoneLabel small {display:block;color:#384450;font-size:11px;font-weight:500;letter-spacing:.02em;margin-top:10px;}
+    .zone.active .zoneLabel {opacity:0;}
+    .joy {position:absolute;display:none;top:0;left:0;width:112px;height:112px;transform:translate(-50%,-50%);border:2px solid #64788d99;border-radius:50%;background:#7fb6fb0a;box-shadow:0 0 30px #4b98df12,inset 0 0 23px #4b98df12;pointer-events:none;}
+    .joy::before,.joy::after {content:"";position:absolute;pointer-events:none;background:#59708644;}
+    .joy::before {left:50%;top:13px;bottom:13px;width:1px;}
+    .joy::after {top:50%;left:13px;right:13px;height:1px;}
+    .joy.knob-look {border-color:#e6ba7666;background:#e6ba7609;box-shadow:0 0 30px #e6ba7612,inset 0 0 23px #e6ba7610;}
+    .nub {width:47px;height:47px;border-radius:50%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border:2px solid #80c8fe;box-shadow:0 0 14px #4b9bdf55;background:#407dba36;}
+    .knob-look .nub {border-color:#f1cf9d;box-shadow:0 0 15px #f1cf9d44;background:#ba7f4033;}
+    .hud {position:absolute;z-index:4;left:0;top:0;width:100%;pointer-events:none;padding:max(env(safe-area-inset-top),14px) 15px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+    .brand {font-size:13px;letter-spacing:.20em;font-weight:800;line-height:1.2;color:#c4d3e3;text-shadow:0 1px 4px #000;}
+    .brand small {display:block;font-size:9px;letter-spacing:.12em;font-weight:500;color:#718497;margin-top:4px;}
+    .actions {display:flex;gap:6px;pointer-events:auto;}
+    button {font:inherit;cursor:pointer;touch-action:manipulation;}
+    .tool {border:1px solid #32414e;background:#121b23df;color:#bcd0df;border-radius:9px;min-height:34px;padding:7px 10px;font-size:11px;font-weight:700;white-space:nowrap;}
+    .tool[aria-pressed="true"] {border-color:#75bffc;color:#bfe4ff;}
+    #soundBtn {border-color:#5a9dce;color:#c5e5fc;}
+    #soundBtn[data-state="on"] {border-color:#366f55;color:#b2e5c5;}
+    #soundBtn[data-state="error"] {border-color:#a46f4b;color:#ffd6a9;}
+    .tool:focus-visible, .primary:focus-visible {outline:2px solid #9ccfff;outline-offset:3px;}
+    .readout {position:absolute;z-index:3;bottom:max(calc(env(safe-area-inset-bottom) + 13px),17px);left:12px;right:12px;text-align:center;color:#84919e;font-size:12px;font-variant-numeric:tabular-nums;pointer-events:none;text-shadow:0 1px 4px #000;}
+    .message {position:absolute;z-index:3;top:72px;left:50%;transform:translateX(-50%);max-width:min(93vw,450px);text-align:center;line-height:1.5;font-size:12px;color:#a1adba;pointer-events:none;opacity:1;transition:opacity .6s;}
+    .message.hidden {opacity:0;}
+    .message.alert {color:#f1bd8b;}
+    .diag {position:absolute;z-index:3;bottom:max(calc(env(safe-area-inset-bottom) + 35px),38px);left:12px;right:12px;text-align:center;pointer-events:none;color:#60778a;font-size:10px;}
+    .compass {position:absolute;z-index:2;top:104px;left:50%;transform:translateX(-50%);color:#617283;font-size:10px;letter-spacing:.1em;pointer-events:none;white-space:nowrap;}
+    .compass strong {color:#c0d5e8;}
+    #mapWrap {position:absolute;z-index:6;right:12px;top:60px;padding:10px 10px 7px;background:#091017ed;border:1px solid #344b61;border-radius:12px;display:none;pointer-events:none;max-width:55vw;box-shadow:0 10px 30px #000a;}
+    #mapWrap.visible {display:block;}
+    #mapWrap .mapTitle {font-size:11px;font-weight:700;letter-spacing:.06em;margin-bottom:6px;color:#b9d2e4;}
+    #mapWrap canvas {display:block;max-width:100%;height:auto;border-radius:4px;}
+    #mapWrap .legend {font-size:10px;margin-top:7px;color:#94aabd;line-height:1.5;}
+    .overlay {display:none;position:absolute;z-index:12;inset:0;background:#000e;align-items:center;justify-content:center;padding:25px;text-align:center;}
+    .overlay.visible {display:flex;}
+    .dialog {max-width:340px;}
+    .dialog h1 {font-size:29px;margin:0 0 13px;letter-spacing:.08em;color:#e1f0ff;}
+    .dialog p {line-height:1.65;color:#aabbcc;font-size:14px;}
+    .primary {border:1px solid #599bc3;background:#183e5a;color:#eef7ff;border-radius:12px;font-weight:700;padding:13px 23px;margin-top:13px;}
+    @media (orientation:landscape) {
+      #lookZone {left:0;right:auto;top:0;bottom:auto;width:50%;height:100%;border-top:0;border-right:1px solid #17212a;}
+      #moveZone {left:50%;top:0;width:50%;height:100%;}
+      .message {top:57px;}
+      .compass {top:91px;}
+      .readout {bottom:max(calc(env(safe-area-inset-bottom) + 8px),10px);}
+      .diag {display:none;}
+    }
+    @media (max-height:425px) and (orientation:landscape) {
+      .brand {font-size:11px;}
+      .message {top:52px;font-size:11px;}
+      .compass {display:none;}
+      #mapWrap {top:52px;}
+    }
+    @media (max-width:360px) {
+      .tool {padding:6px 7px;font-size:10px;}
+      .brand {font-size:11px;}
+      .readout {font-size:11px;}
+    }
+    @media (prefers-reduced-motion:reduce) {.message,.zoneLabel {transition:none;}}
+  </style>
+</head>
+<body>
+<div id="app">
+  <section class="zone" id="moveZone" aria-label="Зона движения">
+    <div class="zoneLabel">ДВИЖЕНИЕ <small>Вперёд · назад · шаг вбок</small></div>
+    <div class="joy" id="moveJoy"><div class="nub"></div></div>
+  </section>
+  <section class="zone" id="lookZone" aria-label="Зона поворота головы">
+    <div class="zoneLabel">ПОВОРОТ ГОЛОВЫ <small>Сдвиг влево / вправо</small></div>
+    <div class="joy knob-look" id="lookJoy"><div class="nub"></div></div>
+  </section>
+
+  <header class="hud">
+    <div class="brand">DARKMAZE3D <small>УРОВЕНЬ 01 · НА СЛУХ</small></div>
+    <nav class="actions" aria-label="Параметры игры">
+      <button class="tool" id="mapBtn" aria-pressed="false" title="Показать скрытую карту">Карта</button>
+      <button class="tool" id="soundBtn" data-state="off" aria-pressed="false" title="Включить звук">▶ Звук</button>
+      <button class="tool" id="resetBtn" title="Начать заново">↻</button>
+    </nav>
+  </header>
+  <div class="message" id="message">Инициализация игры… Если надпись не исчезает — просмотрщик блокирует JavaScript.</div>
+  <div class="compass" id="compass">ВЗГЛЯД <strong>↑</strong> 0°</div>
+  <div class="readout" id="readout">Инициализация…</div>
+  <div class="diag" id="diag">Игровой движок ещё не запущен</div>
+  <div id="mapWrap" aria-hidden="true">
+    <div class="mapTitle">КАРТА ДЛЯ ОТЛАДКИ</div>
+    <canvas id="map" width="264" height="232"></canvas>
+    <div class="legend">● игрок · <span style="color:#88dcff">●</span> вода · <span style="color:#f4c783">●</span> металл · <span style="color:#8deda3">●</span> выход</div>
+  </div>
+  <div class="overlay" id="winOverlay" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="dialog">
+      <h1 id="winTitle">ВЫХОД НАЙДЕН</h1>
+      <p id="winText">Вы выбрались из лабиринта.</p>
+      <button class="primary" id="againBtn">Пройти ещё раз</button>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  'use strict';
+
+  // Уровень фиксирован. # = стена, . = свободная клетка.
+  // Геометрия существует только как двумерная сетка: 3D нужно для звука.
+  const MAZE = [
+    '#############',
+    '#############',
+    '#############',
+    '#####.#...###',
+    '#####.#.#####',
+    '###.....#####',
+    '###.#########',
+    '#...#########',
+    '###.#########',
+    '###.#########',
+    '#############'
+  ];
+  const TILE = 2.4;     // ширина коридора: 3 диаметра игрока (0.8 м)
+  const RADIUS = 0.40;  // радиус игрока
+  const STEP_LENGTH = 0.74; // один звук шага на 0.74 м фактического пути
+  const MOVE_SPEED = 1.90;  // м/с при полном отклонении джойстика
+  const TURN_SPEED = 2.25;  // рад/с при полном отклонении джойстика
+  const SPAWN = {c:3, r:9, yaw:0};
+  const SOUND_POINTS = {
+    water: {c:1,r:7},   // тупик №1
+    metal: {c:5,r:3},   // тупик №2
+    exit:  {c:9,r:3}    // конец основного маршрута
+  };
+  const cellPoint = ({c,r}) => ({x:(c+0.5)*TILE,z:(r+0.5)*TILE});
+  const start = cellPoint(SPAWN);
+  const player = {x:start.x,z:start.z,yaw:SPAWN.yaw};
+  const game = {steps:0, distance:0, stepAccum:0, startedAt:null, won:false, lastBump:-Infinity, lastFrame:performance.now()};
+  const controls = {
+    move:{x:0,y:0,pointer:null,cx:0,cy:0},
+    look:{x:0,y:0,pointer:null,cx:0,cy:0}
+  };
+  const pressed = new Set();
+  const el = Object.fromEntries(['moveZone','lookZone','moveJoy','lookJoy','mapBtn','soundBtn','resetBtn','message','readout','compass','mapWrap','map','winOverlay','winText','againBtn','diag'].map(id=>[id,document.getElementById(id)]));
+  const M = el.map.getContext('2d');
+  let showMap=false;
+  let mute=false;
+  let audio=null;
+  let audioStarting=false;
+  let audioError=false;
+  let nextSound={water:0,metal:0,exit:0};
+
+  function walkable(c,r) {return MAZE[r]?.[c]==='.';}
+  function validPosition(x,z) {
+    // Столкновение круга игрока с прямоугольниками стен.
+    const c0=Math.floor((x-RADIUS)/TILE)-1, c1=Math.floor((x+RADIUS)/TILE)+1;
+    const r0=Math.floor((z-RADIUS)/TILE)-1, r1=Math.floor((z+RADIUS)/TILE)+1;
+    for (let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++) {
+      if (walkable(c,r)) continue;
+      const left=c*TILE, right=(c+1)*TILE, top=r*TILE,bottom=(r+1)*TILE;
+      const nx=Math.max(left,Math.min(x,right));
+      const nz=Math.max(top,Math.min(z,bottom));
+      if ((x-nx)**2+(z-nz)**2 < RADIUS**2) return false;
+    }
+    return true;
+  }
+
+  function moveBy(dx,dz) {
+    // Пошаговая проверка для предотвращения прохода сквозь стену на быстрых устройствах.
+    const substeps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/0.11));
+    const sx=dx/substeps, sz=dz/substeps;
+    const beforeX=player.x,beforeZ=player.z;
+    let hit=false;
+    for (let i=0;i<substeps;i++) {
+      // Независимая проверка осей позволяет скользить вдоль стены.
+      if (validPosition(player.x+sx,player.z)) player.x+=sx;
+      else if (Math.abs(sx)>1e-8) hit=true;
+      if (validPosition(player.x,player.z+sz)) player.z+=sz;
+      else if (Math.abs(sz)>1e-8) hit=true;
+    }
+    const actual=Math.hypot(player.x-beforeX,player.z-beforeZ);
+    if(actual>0) {
+      game.distance+=actual;
+      game.stepAccum+=actual;
+      while(game.stepAccum>=STEP_LENGTH) {
+        game.stepAccum-=STEP_LENGTH;
+        game.steps++;
+        playStep(game.steps % 2);
+      }
+    }
+    if(hit && performance.now()-game.lastBump>350) {
+      game.lastBump=performance.now();
+      playBump();
+      if (navigator.vibrate) navigator.vibrate(26);
+    }
+    return actual;
+  }
+
+  function createPanner(x,y,z) {
+    const p=audio.ctx.createPanner();
+    p.panningModel='HRTF';
+    p.distanceModel='inverse';
+    p.refDistance=1.7;
+    p.maxDistance=80;
+    p.rolloffFactor=0.70;
+    p.coneInnerAngle=360;
+    p.coneOuterAngle=360;
+    if(p.positionX) {
+      p.positionX.value=x;p.positionY.value=y;p.positionZ.value=z;
+    } else p.setPosition(x,y,z);
+    p.connect(audio.master);
+    return p;
+  }
+
+  function setPannerPosition(p,x,y,z) {
+    if (p.positionX) {
+      p.positionX.value=x;p.positionY.value=y;p.positionZ.value=z;
+    } else p.setPosition(x,y,z);
+  }
+
+  function makeNoiseBuffer(duration=1) {
+    const sampleRate=audio.ctx.sampleRate;
+    const buf=audio.ctx.createBuffer(1,Math.ceil(sampleRate*duration),sampleRate);
+    const data=buf.getChannelData(0);
+    for(let i=0;i<data.length;i++) data[i]=Math.random()*2-1;
+    return buf;
+  }
+
+  function initAudio() {
+    if(audio) return;
+    const AudioCtor=window.AudioContext||window.webkitAudioContext;
+    if(!AudioCtor) {el.message.textContent='Браузер не поддерживает Web Audio API.';return;}
+    try {
+      const ctx=new AudioCtor({latencyHint:'interactive'});
+      const master=ctx.createGain();master.gain.value=mute?0:0.87;master.connect(ctx.destination);
+      audio={ctx,master,noise:null,panners:{},foot:null,ambience:[]};
+      audio.noise=makeNoiseBuffer(1.5);
+      for(const [name,point] of Object.entries(SOUND_POINTS)) {
+        const pos=cellPoint(point);
+        audio.panners[name]=createPanner(pos.x,0,pos.z);
+      }
+      audio.foot=createPanner(player.x,-1.2,player.z);
+      audio.foot.rolloffFactor=0;
+      // Постоянный тихий шум воздуха: игрок не оказывается в полной тишине.
+      const wind=ctx.createBufferSource();wind.buffer=audio.noise;wind.loop=true;
+      const windFilter=ctx.createBiquadFilter();windFilter.type='lowpass';windFilter.frequency.value=430;
+      const windGain=ctx.createGain();windGain.gain.value=0.048;
+      wind.connect(windFilter);windFilter.connect(windGain);windGain.connect(master);wind.start();
+      const hum=ctx.createOscillator();hum.type='sine';hum.frequency.value=57;
+      const humGain=ctx.createGain();humGain.gain.value=0.018;
+      hum.connect(humGain);humGain.connect(master);hum.start();
+      audio.ambience=[wind,hum];
+      const t=ctx.currentTime;
+      nextSound={water:t+0.18,metal:t+0.92,exit:t+1.58};
+      updateListener();
+      // Не отмечаем звук включённым до фактического state === 'running'.
+      renderAudioStatus();
+    } catch(err) {
+      audio=null;
+      audioError=true;
+      renderAudioStatus();
+      el.message.textContent='Ошибка запуска звука: '+err.message+'. Управление остаётся доступным.';
+      el.message.classList.add('alert');
+      console.error(err);
+    }
+  }
+
+  function renderAudioStatus() {
+    const running=!!audio&&audio.ctx.state==='running';
+    const state=audioError?'error':mute?'muted':running?'on':'off';
+    el.soundBtn.dataset.state=state;
+    el.soundBtn.textContent=audioError?'Звук: ошибка':mute?'Звук: выкл':running?'Звук: вкл':audioStarting?'Звук: запуск…':'▶ Звук';
+    el.soundBtn.setAttribute('aria-pressed',String(running&&!mute));
+    el.diag.textContent='JS работает · аудио '+(audioError?'ошибка':running?'активно':audioStarting?'запускается':'не запущено');
+  }
+
+  async function unlockAudio() {
+    if(audioStarting)return;
+    audioStarting=true;audioError=false;
+    try {
+      if(!audio)initAudio();
+      if(!audio)return;
+      const ctx=audio.ctx;
+      if(ctx.state!=='running') {
+        // Выполняется непосредственно в touch/click — это важно для Safari iOS.
+        const resumePromise=ctx.resume();
+        // Некоторые браузеры зависают в suspended, если не дали разрешение.
+        await Promise.race([resumePromise,new Promise((_,reject)=>setTimeout(()=>reject(new Error('Браузер не разрешил воспроизведение')),2500))]);
+      }
+      if(ctx.state!=='running')throw new Error('AudioContext в состоянии '+ctx.state);
+      el.message.classList.remove('alert','hidden');
+      el.message.textContent='Звук включён. УДЕРЖИВАЙ палец и сдвигай его от места касания для движения.';
+      setTimeout(()=>el.message.classList.add('hidden'),5000);
+    } catch(err) {
+      audioError=true;
+      el.message.classList.remove('hidden');
+      el.message.classList.add('alert');
+      el.message.textContent='Звук не запустился: '+err.message+'. Попробуй открыть страницу по HTTPS в Safari. Управление доступно без звука.';
+      console.warn('Web Audio:',err);
+    } finally {
+      audioStarting=false;
+      renderAudioStatus();
+    }
+    if(game.startedAt===null)game.startedAt=performance.now();
+  }
+
+  function updateListener() {
+    if(!audio)return;
+    const l=audio.ctx.listener;
+    const x=player.x,z=player.z,fx=Math.sin(player.yaw),fz=-Math.cos(player.yaw);
+    if(l.positionX && l.forwardX) {
+      l.positionX.value=x;l.positionY.value=0;l.positionZ.value=z;
+      l.forwardX.value=fx;l.forwardY.value=0;l.forwardZ.value=fz;
+      l.upX.value=0;l.upY.value=1;l.upZ.value=0;
+    } else {
+      l.setPosition(x,0,z);
+      l.setOrientation(fx,0,fz,0,1,0);
+    }
+    setPannerPosition(audio.foot,x,-1.2,z);
+  }
+
+  function tone({at=0,freq=440,toFreq=freq,type='sine',gain=0.12,duration=0.3,output,attack=0.006}) {
+    if(!audio)return;
+    const ctx=audio.ctx,t=Math.max(ctx.currentTime,at||ctx.currentTime);
+    const osc=ctx.createOscillator(),env=ctx.createGain();
+    osc.type=type;
+    osc.frequency.setValueAtTime(freq,t);
+    if (toFreq!==freq) osc.frequency.exponentialRampToValueAtTime(Math.max(1,toFreq),t+duration);
+    env.gain.setValueAtTime(0.0001,t);
+    env.gain.exponentialRampToValueAtTime(Math.max(gain,0.0002),t+attack);
+    env.gain.exponentialRampToValueAtTime(0.0001,t+duration);
+    osc.connect(env);env.connect(output||audio.master);
+    osc.start(t);osc.stop(t+duration+0.025);
+    osc.onended=()=>{osc.disconnect();env.disconnect();};
+  }
+
+  function noiseHit({at=0, duration=0.13, gain=0.17, filterType='lowpass', frequency=900, output}) {
+    if(!audio)return;
+    const ctx=audio.ctx,t=Math.max(ctx.currentTime,at||ctx.currentTime);
+    const src=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),env=ctx.createGain();
+    src.buffer=audio.noise;filter.type=filterType;filter.frequency.value=frequency;
+    env.gain.setValueAtTime(gain,t);
+    env.gain.exponentialRampToValueAtTime(0.0001,t+duration);
+    src.connect(filter);filter.connect(env);env.connect(output||audio.master);
+    src.start(t,Math.random()*0.25,duration+0.01);src.stop(t+duration+0.01);
+    src.onended=()=>{src.disconnect();filter.disconnect();env.disconnect();};
+  }
+
+  function playStep(leftFoot) {
+    if(!audio||mute||audio.ctx.state!=='running')return;
+    const t=audio.ctx.currentTime;
+    noiseHit({at:t,duration:0.12,gain:leftFoot?0.21:0.18,filterType:'bandpass',frequency:leftFoot?600:470,output:audio.foot});
+    tone({at:t,freq:leftFoot?116:105,toFreq:68,type:'triangle',gain:0.10,duration:0.13,output:audio.foot});
+  }
+
+  function playBump() {
+    if(!audio||mute||audio.ctx.state!=='running')return;
+    const t=audio.ctx.currentTime;
+    tone({at:t,freq:145,toFreq:55,type:'triangle',gain:0.24,duration:0.21,output:audio.foot});
+    noiseHit({at:t,duration:0.13,gain:0.25,filterType:'lowpass',frequency:800,output:audio.foot});
+  }
+
+  function soundWater(t) {
+    const p=audio.panners.water;
+    tone({at:t,freq:740,toFreq:480,gain:0.42,duration:0.17,output:p,attack:0.004});
+    tone({at:t+0.22,freq:520,toFreq:320,gain:0.29,duration:0.15,output:p,attack:0.004});
+    noiseHit({at:t,duration:0.08,gain:0.065,filterType:'highpass',frequency:1800,output:p});
+  }
+  function soundMetal(t) {
+    const p=audio.panners.metal;
+    tone({at:t,freq:525,gain:0.31,duration:1.05,output:p,attack:0.008});
+    tone({at:t,freq:1056,gain:0.20,duration:0.66,output:p,attack:0.007});
+    tone({at:t,freq:1607,gain:0.10,duration:0.40,output:p,attack:0.005});
+  }
+  function soundExit(t) {
+    const p=audio.panners.exit;
+    tone({at:t,freq:392,gain:0.32,duration:0.65,output:p});
+    tone({at:t+0.20,freq:587.33,gain:0.31,duration:0.68,output:p});
+    tone({at:t+0.41,freq:783.99,gain:0.29,duration:0.78,output:p});
+  }
+
+  function scheduleAudio() {
+    if(!audio||audio.ctx.state!=='running'||mute||game.won)return;
+    const t=audio.ctx.currentTime;
+    // Планирование вперёд исключает пропуски при неравномерной отрисовке.
+    const tasks=[['water',2.35,soundWater],['metal',3.55,soundMetal],['exit',4.15,soundExit]];
+    for(const [name,interval,fn] of tasks) {
+      while(nextSound[name]<t+0.25) {
+        if(nextSound[name]>t-0.6) fn(nextSound[name]);
+        nextSound[name]+=interval;
+      }
+    }
+  }
+
+  function playWin() {
+    if(!audio || mute)return;
+    const t=audio.ctx.currentTime;
+    for (const [i,f] of [392,523.25,659.25,783.99].entries())
+      tone({at:t+i*0.18,freq:f,gain:0.16,duration:1.4,output:audio.master});
+  }
+
+  function checkWin() {
+    const pos=cellPoint(SOUND_POINTS.exit);
+    if(!game.won && Math.hypot(player.x-pos.x,player.z-pos.z)<0.68) {
+      game.won=true;pressed.clear();releaseAll();
+      playWin();
+      const sec=game.startedAt===null?0:Math.floor((performance.now()-game.startedAt)/1000);
+      el.winText.textContent=`Пройдено ${game.distance.toFixed(1)} м · ${game.steps} шагов · ${formatTime(sec)}. Два боковых коридора ведут в звуковые тупики.`;
+      el.winOverlay.classList.add('visible');
+    }
+  }
+
+  function formatTime(seconds) {
+    return `${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
+  }
+
+  function renderHUD() {
+    const seconds=game.startedAt===null?0:Math.floor((performance.now()-game.startedAt)/1000);
+    el.readout.textContent=`${game.steps} шагов · ${game.distance.toFixed(1)} м · ${formatTime(seconds)}`;
+    const angle=((Math.round(player.yaw*180/Math.PI)%360)+360)%360;
+    el.compass.innerHTML=`ВЗГЛЯД <strong>↑</strong> ${angle}°`;
+  }
+
+  function drawMap() {
+    if (!showMap)return;
+    const k=20,padding=4;
+    const width=MAZE[0].length*k+padding*2,height=MAZE.length*k+padding*2;
+    if(el.map.width!==width)el.map.width=width;
+    if(el.map.height!==height)el.map.height=height;
+    M.fillStyle='#080e14';M.fillRect(0,0,width,height);
+    for(let r=0;r<MAZE.length;r++) for(let c=0;c<MAZE[r].length;c++) {
+      M.fillStyle=walkable(c,r)?'#162e3c':'#526576';
+      M.fillRect(padding+c*k+0.6,padding+r*k+0.6,k-1.2,k-1.2);
+    }
+    for(const [name,point] of Object.entries(SOUND_POINTS)) {
+      const pos=cellPoint(point),x=padding+pos.x/TILE*k,z=padding+pos.z/TILE*k;
+      M.beginPath();M.arc(x,z,4.6,0,Math.PI*2);
+      M.fillStyle=({water:'#88dcff',metal:'#f4c783',exit:'#8deda3'})[name];M.fill();
+    }
+    const px=padding+player.x/TILE*k,pz=padding+player.z/TILE*k;
+    M.fillStyle='#fff';M.beginPath();M.arc(px,pz,5,0,Math.PI*2);M.fill();
+    M.strokeStyle='#49d1ff';M.lineWidth=2.3;M.beginPath();M.moveTo(px,pz);
+    M.lineTo(px+Math.sin(player.yaw)*14,pz-Math.cos(player.yaw)*14);M.stroke();
+  }
+
+  const JOY_RANGE=54;
+  function bindStick(zone,joy,control) {
+    function startStick(id,x,y) {
+      if(control.pointer!==null||game.won)return;
+      control.pointer=id;
+      const rect=zone.getBoundingClientRect();
+      control.cx=x;control.cy=y;
+      joy.style.left=`${x-rect.left}px`;
+      joy.style.top=`${y-rect.top}px`;
+      joy.style.display='block';zone.classList.add('active');
+      updateStick(id,x,y);
+      // Звук не должен блокировать движение, даже если браузер его не разрешил.
+      if(!audio||audio.ctx.state!=='running')unlockAudio();
+      if(game.startedAt===null)game.startedAt=performance.now();
+    }
+    function updateStick(id,x,y) {
+      if(control.pointer!==id)return;
+      const dx=x-control.cx,dy=y-control.cy;
+      const len=Math.hypot(dx,dy),scale=len>JOY_RANGE?JOY_RANGE/len:1;
+      const ox=dx*scale,oy=dy*scale;
+      control.x=ox/JOY_RANGE;control.y=oy/JOY_RANGE;
+      joy.firstElementChild.style.transform=`translate(-50%,-50%) translate(${ox}px,${oy}px)`;
+    }
+    function endStick(id) {
+      if(control.pointer!==id)return;
+      control.pointer=null;control.x=0;control.y=0;
+      joy.style.display='none';zone.classList.remove('active');
+    }
+    // Для сенсорного iPhone используем touch-поток, чтобы не зависеть от
+    // особенностей pointercapture в HTML-просмотрщиках Safari/WebView.
+    zone.addEventListener('touchstart',e=>{
+      if(game.won)return;
+      e.preventDefault();
+      for(const t of e.changedTouches) {
+        if(control.pointer===null)startStick('touch:'+t.identifier,t.clientX,t.clientY);
+      }
+    },{passive:false});
+    zone.addEventListener('touchmove',e=>{
+      e.preventDefault();
+      for(const t of e.changedTouches)updateStick('touch:'+t.identifier,t.clientX,t.clientY);
+    },{passive:false});
+    const endTouches=e=>{
+      e.preventDefault();
+      for(const t of e.changedTouches)endStick('touch:'+t.identifier);
+    };
+    zone.addEventListener('touchend',endTouches,{passive:false});
+    zone.addEventListener('touchcancel',endTouches,{passive:false});
+    // На компьютерах — Pointer Events для мыши и пера; тач не дублируем.
+    zone.addEventListener('pointerdown',e=>{
+      if(e.pointerType==='touch'||(e.pointerType==='mouse'&&e.button!==0))return;
+      e.preventDefault();
+      startStick('pointer:'+e.pointerId,e.clientX,e.clientY);
+      try{zone.setPointerCapture(e.pointerId);}catch{}
+    });
+    zone.addEventListener('pointermove',e=>{
+      if(e.pointerType==='touch')return;
+      if(control.pointer==='pointer:'+e.pointerId){e.preventDefault();updateStick('pointer:'+e.pointerId,e.clientX,e.clientY);}
+    });
+    for(const name of ['pointerup','pointercancel','lostpointercapture'])
+      zone.addEventListener(name,e=>endStick('pointer:'+e.pointerId));
+  }
+  bindStick(el.moveZone,el.moveJoy,controls.move);
+  bindStick(el.lookZone,el.lookJoy,controls.look);
+
+  function releaseAll() {
+    for(const [key,zone,joy] of [['move',el.moveZone,el.moveJoy],['look',el.lookZone,el.lookJoy]]) {
+      const control=controls[key];
+      if(control.pointer!==null) {
+        try {if(typeof control.pointer==='string' && control.pointer.startsWith('pointer:')) { const id=Number(control.pointer.slice(8)); if(zone.hasPointerCapture(id))zone.releasePointerCapture(id); }}catch{}
+      }
+      control.pointer=null;control.x=0;control.y=0;
+      zone.classList.remove('active');joy.style.display='none';
+    }
+  }
+
+  function reset() {
+    player.x=start.x;player.z=start.z;player.yaw=SPAWN.yaw;
+    game.steps=0;game.distance=0;game.stepAccum=0;game.startedAt=audio?performance.now():null;
+    game.won=false;game.lastBump=-Infinity;
+    pressed.clear();releaseAll();el.winOverlay.classList.remove('visible');
+    if(audio) {
+      const t=audio.ctx.currentTime;
+      nextSound={water:t+0.3,metal:t+1.1,exit:t+1.8};
+      updateListener();
+    }
+    renderHUD();drawMap();
+  }
+
+  el.mapBtn.addEventListener('click',()=>{
+    showMap=!showMap;
+    el.mapWrap.classList.toggle('visible',showMap);
+    el.mapBtn.setAttribute('aria-pressed',String(showMap));
+    drawMap();
+  });
+  el.soundBtn.addEventListener('click',()=>{
+    if(!audio||audio.ctx.state!=='running') {
+      // При ПЕРВОМ клике только включаем аудио, а не переключаем mute!
+      mute=false;
+      if(audio)audio.master.gain.setTargetAtTime(0.87,audio.ctx.currentTime,0.015);
+      unlockAudio();
+    } else {
+      mute=!mute;
+      audio.master.gain.setTargetAtTime(mute?0:0.87,audio.ctx.currentTime,0.015);
+      renderAudioStatus();
+    }
+  });
+  el.resetBtn.addEventListener('click',reset);
+  el.againBtn.addEventListener('click',()=>{unlockAudio();reset();});
+
+  const preventKeys=['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '];
+  window.addEventListener('keydown',e=>{
+    if(preventKeys.includes(e.key))e.preventDefault();
+    if(e.repeat && ['m','M','r','R'].includes(e.key))return;
+    pressed.add(e.code);
+    if(e.key==='m'||e.key==='M')el.mapBtn.click();
+    if(e.key==='r'||e.key==='R')reset();
+    if([' ','w','a','s','d','ArrowLeft','ArrowRight'].includes(e.key))unlockAudio();
+  });
+  window.addEventListener('keyup',e=>pressed.delete(e.code));
+  window.addEventListener('blur',()=>{pressed.clear();releaseAll();});
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){pressed.clear();releaseAll();}
+    else game.lastFrame=performance.now();
+  });
+  window.addEventListener('resize',()=>{releaseAll();drawMap();});
+
+  function frame(now) {
+    let dt=Math.min(0.04,Math.max(0,(now-game.lastFrame)/1000));
+    game.lastFrame=now;
+    if(!game.won) {
+      let look=controls.look.x;
+      if(pressed.has('ArrowLeft')||pressed.has('KeyQ'))look-=1;
+      if(pressed.has('ArrowRight')||pressed.has('KeyE'))look+=1;
+      if(Math.abs(look)>0.09)player.yaw+=Math.max(-1,Math.min(1,look))*TURN_SPEED*dt;
+      let mx=controls.move.x,my=controls.move.y;
+      if(pressed.has('KeyW')||pressed.has('ArrowUp'))my-=1;
+      if(pressed.has('KeyS')||pressed.has('ArrowDown'))my+=1;
+      if(pressed.has('KeyA'))mx-=1;
+      if(pressed.has('KeyD'))mx+=1;
+      mx=Math.max(-1,Math.min(1,mx));my=Math.max(-1,Math.min(1,my));
+      // Нет диагонального хода: в каждый момент только одна локальная ось.
+      const forward=-my;
+      const strafe=mx;
+      const axis=Math.abs(forward)>=Math.abs(strafe)?'forward':'strafe';
+      const intensity=axis==='forward'?forward:strafe;
+      if(Math.abs(intensity)>0.13) {
+        const speed=MOVE_SPEED*Math.sign(intensity)*(Math.abs(intensity)-0.13)/0.87;
+        const dx=(axis==='forward'?Math.sin(player.yaw):Math.cos(player.y))*speed*dt;
+        const dz=(axis==='forward'?-Math.cos(player.yaw):Math.sin(player.yaw))*speed*dt;
+        moveBy(dx,dz);
+        checkWin();
+      }
+      updateListener();
+      scheduleAudio();
+      renderHUD();
+      drawMap();
+    }
+    requestAnimationFrame(frame);
+  }
+  renderAudioStatus();
+  el.message.textContent='Игра готова. Нажми «▶ Звук», затем УДЕРЖИВАЙ палец в зоне движения и сдвигай его. Вторая зона вращает голову.';
+  requestAnimationFrame(frame);
+  // Удобный, только для отладки интерфейс в DevTools, не влияет на игровой UI.
+  window.DarkMaze3D={get state(){return {x:player.x,z:player.z,yaw:player.yaw,steps:game.steps,distance:game.distance,won:game.won,audioState:audio?.ctx.state??"not initialized",muted:mute,level:MAZE.map(s=>s)};},reset,showMap:()=>el.mapBtn.click()};
+})();
+</script>
+</body>
+</html>
