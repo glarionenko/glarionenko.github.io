@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#000000">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>DarkMaze3D v3 — звуковой лабиринт</title>
+  <title>DarkMaze3D v4 — звуковой лабиринт</title>
   <style>
     :root {color-scheme:dark; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; --blue:#70bbf8; --orange:#edc885; --muted:#8999aa;}
     *, *::before, *::after {box-sizing:border-box;}
@@ -80,11 +80,11 @@
 <body>
 <div id="app">
   <section class="zone" id="moveZone" aria-label="Зона движения">
-    <div class="zoneLabel">ДВИЖЕНИЕ <small>Вперёд · назад · шаг вбок</small></div>
+    <div class="zoneLabel">ДВИЖЕНИЕ <small>В любую сторону · взгляд поворачивается следом</small></div>
     <div class="joy" id="moveJoy"><div class="nub"></div></div>
   </section>
   <section class="zone" id="lookZone" aria-label="Зона поворота головы">
-    <div class="zoneLabel">НАПРАВЛЕНИЕ ВЗГЛЯДА <small>Веди в сторону поворота · отпусти для фиксации</small></div>
+    <div class="zoneLabel">ПОВОРОТ НА МЕСТЕ <small>Направь палец · отпусти для фиксации</small></div>
     <div class="joy knob-look" id="lookJoy"><div class="nub"></div></div>
   </section>
 
@@ -136,6 +136,7 @@
   const RADIUS = 0.40;  // радиус игрока
   const STEP_LENGTH = 0.74; // один звук шага на 0.74 м фактического пути
   const MOVE_SPEED = 1.90;  // м/с при полном отклонении джойстика
+  const MOVE_DEAD_ZONE = 0.14; // мёртвая зона по полному радиусу, а не по осям
   const TURN_SPEED = 2.25;  // рад/с только для клавиатуры (Q/E и стрелки)
   const SPAWN = {c:3, r:9, yaw:0};
   const SOUND_POINTS = {
@@ -143,15 +144,21 @@
     metal: {c:5,r:3},   // тупик №2
     exit:  {c:9,r:3}    // конец основного маршрута
   };
+  const BEACON_ACOUSTICS = {
+    water:{range:14,volume:0.56}, // близкий текущий ручей
+    metal:{range:18,volume:0.50}, // гудящий электрический механизм
+    exit:{range:23,volume:0.47}   // радиопомехи у выхода (не настоящая речь)
+  };
   const cellPoint = ({c,r}) => ({x:(c+0.5)*TILE,z:(r+0.5)*TILE});
   const start = cellPoint(SPAWN);
   const player = {x:start.x,z:start.z,yaw:SPAWN.yaw};
   const game = {steps:0, distance:0, stepAccum:0, startedAt:null, won:false, lastBump:-Infinity, lastFrame:performance.now()};
   const controls = {
-    move:{x:0,y:0,pointer:null,cx:0,cy:0},
+    move:{x:0,y:0,pointer:null,cx:0,cy:0,baseYaw:SPAWN.yaw},
     look:{x:0,y:0,pointer:null,cx:0,cy:0,baseYaw:SPAWN.yaw}
   };
   const pressed = new Set();
+  let keyboardMoveBase=null;
   const el = Object.fromEntries(['moveZone','lookZone','moveJoy','lookJoy','mapBtn','soundBtn','resetBtn','message','readout','compass','mapWrap','map','winOverlay','winText','againBtn','diag'].map(id=>[id,document.getElementById(id)]));
   const M = el.map.getContext('2d');
   let showMap=false;
@@ -210,10 +217,11 @@
   function createPanner(x,y,z) {
     const p=audio.ctx.createPanner();
     p.panningModel='HRTF';
-    p.distanceModel='inverse';
-    p.refDistance=1.7;
-    p.maxDistance=80;
-    p.rolloffFactor=0.70;
+    // HRTF сохраняет направление, расстояние подчёркивается плавным уровнем + фильтром.
+    p.distanceModel='linear';
+    p.refDistance=1.1;
+    p.maxDistance=25;
+    p.rolloffFactor=1.0;
     p.coneInnerAngle=360;
     p.coneOuterAngle=360;
     if(p.positionX) {
@@ -229,12 +237,53 @@
     } else p.setPosition(x,y,z);
   }
 
-  function makeNoiseBuffer(duration=1) {
+  function makeNoiseBuffer(duration=3.7) {
     const sampleRate=audio.ctx.sampleRate;
     const buf=audio.ctx.createBuffer(1,Math.ceil(sampleRate*duration),sampleRate);
     const data=buf.getChannelData(0);
     for(let i=0;i<data.length;i++) data[i]=Math.random()*2-1;
     return buf;
+  }
+
+  // Вся озвучка маяков проходит через Web Audio и пространственный PannerNode.
+  // SpeechSynthesis намеренно не используем: на iOS его нельзя надёжно
+  // подключить к PannerNode, поэтому реальная речь потеряла бы локализацию.
+  function addNoiseBed(input,{type='bandpass',frequency=1100,q=0.8,gain=0.1,rate=1}) {
+    const ctx=audio.ctx,src=ctx.createBufferSource();
+    src.buffer=audio.noise;src.loop=true;src.playbackRate.value=rate;
+    const filter=ctx.createBiquadFilter();filter.type=type;filter.frequency.value=frequency;filter.Q.value=q;
+    const level=ctx.createGain();level.gain.value=gain;
+    src.connect(filter);filter.connect(level);level.connect(input);
+    src.start(0,Math.random()*1.5);audio.looping.push(src);
+    return level;
+  }
+  function addDrone(input,{frequency=90,gain=0.07,wave='sine'}) {
+    const ctx=audio.ctx,osc=ctx.createOscillator(),level=ctx.createGain();
+    osc.type=wave;osc.frequency.value=frequency;level.gain.value=gain;
+    osc.connect(level);level.connect(input);osc.start();audio.looping.push(osc);
+    return level;
+  }
+  function tremolo(level,depth,rate) {
+    const ctx=audio.ctx,osc=ctx.createOscillator(),amount=ctx.createGain();
+    osc.frequency.value=rate;osc.type='sine';amount.gain.value=depth;
+    osc.connect(amount);amount.connect(level.gain);osc.start();audio.looping.push(osc);
+  }
+  function startContinuousBeacons() {
+    const water=audio.emitters.water.input;
+    const river=addNoiseBed(water,{type:'bandpass',frequency:950,q:0.37,gain:0.21,rate:0.94});
+    tremolo(river,0.052,0.18);
+    addNoiseBed(water,{type:'highpass',frequency:1900,gain:0.046,rate:1.08});
+    const metal=audio.emitters.metal.input;
+    const engine=addDrone(metal,{frequency:103,gain:0.09,wave:'sawtooth'});
+    tremolo(engine,0.032,0.72);
+    addNoiseBed(metal,{type:'bandpass',frequency:740,q:1.5,gain:0.068,rate:0.84});
+    const radio=audio.emitters.exit.input;
+    const voiceFormant=addNoiseBed(radio,{type:'bandpass',frequency:780,q:1.4,gain:0.135,rate:0.91});
+    const consonants=addNoiseBed(radio,{type:'bandpass',frequency:1700,q:1,gain:0.063,rate:1.13});
+    tremolo(voiceFormant,0.105,0.39);
+    tremolo(consonants,0.046,0.43);
+    const intercom=addDrone(radio,{frequency:141,gain:0.028,wave:'triangle'});
+    tremolo(intercom,0.014,0.36);
   }
 
   function initAudio() {
@@ -244,21 +293,27 @@
     try {
       const ctx=new AudioCtor({latencyHint:'interactive'});
       const master=ctx.createGain();master.gain.value=mute?0:0.87;master.connect(ctx.destination);
-      audio={ctx,master,noise:null,panners:{},foot:null,ambience:[]};
-      audio.noise=makeNoiseBuffer(1.5);
+      audio={ctx,master,noise:null,panners:{},emitters:{},foot:null,ambience:[],looping:[]};
+      audio.noise=makeNoiseBuffer(3.7);
       for(const [name,point] of Object.entries(SOUND_POINTS)) {
         const pos=cellPoint(point);
-        audio.panners[name]=createPanner(pos.x,0,pos.z);
+        const panner=createPanner(pos.x,0,pos.z);
+        const filter=ctx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=1700;
+        const level=ctx.createGain();level.gain.value=0;
+        filter.connect(level);level.connect(panner);
+        audio.panners[name]=panner;
+        audio.emitters[name]={input:filter,filter,level,pos,...BEACON_ACOUSTICS[name]};
       }
+      startContinuousBeacons();
       audio.foot=createPanner(player.x,-1.2,player.z);
       audio.foot.rolloffFactor=0;
       // Постоянный тихий шум воздуха: игрок не оказывается в полной тишине.
       const wind=ctx.createBufferSource();wind.buffer=audio.noise;wind.loop=true;
       const windFilter=ctx.createBiquadFilter();windFilter.type='lowpass';windFilter.frequency.value=430;
-      const windGain=ctx.createGain();windGain.gain.value=0.048;
+      const windGain=ctx.createGain();windGain.gain.value=0.027;
       wind.connect(windFilter);windFilter.connect(windGain);windGain.connect(master);wind.start();
       const hum=ctx.createOscillator();hum.type='sine';hum.frequency.value=57;
-      const humGain=ctx.createGain();humGain.gain.value=0.018;
+      const humGain=ctx.createGain();humGain.gain.value=0.012;
       hum.connect(humGain);humGain.connect(master);hum.start();
       audio.ambience=[wind,hum];
       const t=ctx.currentTime;
@@ -328,6 +383,18 @@
       l.setOrientation(fx,0,fz,0,1,0);
     }
     setPannerPosition(audio.foot,x,-1.2,z);
+    // Затухание с расстоянием в МЕТРАХ и исчезновение высоких частот.
+    // Направление спереди/сзади дополнительно подчёркивается тембром.
+    for(const emitter of Object.values(audio.emitters)) {
+      const dx=emitter.pos.x-x,dz=emitter.pos.z-z,d=Math.hypot(dx,dz);
+      const near=Math.max(0,Math.min(1,(emitter.range-d)/(emitter.range-1.1)));
+      const angleFront=d>0.01?(dx*fx+dz*fz)/d:1;
+      const frontal=(angleFront+1)*0.5; // 0 сзади, 1 спереди
+      const level=emitter.volume*near*near;
+      const cutoff=(550+9700*Math.pow(near,0.8))*(0.50+0.50*frontal);
+      emitter.level.gain.setTargetAtTime(level,audio.ctx.currentTime,0.060);
+      emitter.filter.frequency.setTargetAtTime(cutoff,audio.ctx.currentTime,0.075);
+    }
   }
 
   function tone({at=0,freq=440,toFreq=freq,type='sine',gain=0.12,duration=0.3,output,attack=0.006}) {
@@ -372,19 +439,19 @@
   }
 
   function soundWater(t) {
-    const p=audio.panners.water;
+    const p=audio.emitters.water.input;
     tone({at:t,freq:740,toFreq:480,gain:0.42,duration:0.17,output:p,attack:0.004});
     tone({at:t+0.22,freq:520,toFreq:320,gain:0.29,duration:0.15,output:p,attack:0.004});
     noiseHit({at:t,duration:0.08,gain:0.065,filterType:'highpass',frequency:1800,output:p});
   }
   function soundMetal(t) {
-    const p=audio.panners.metal;
+    const p=audio.emitters.metal.input;
     tone({at:t,freq:525,gain:0.31,duration:1.05,output:p,attack:0.008});
     tone({at:t,freq:1056,gain:0.20,duration:0.66,output:p,attack:0.007});
     tone({at:t,freq:1607,gain:0.10,duration:0.40,output:p,attack:0.005});
   }
   function soundExit(t) {
-    const p=audio.panners.exit;
+    const p=audio.emitters.exit.input;
     tone({at:t,freq:392,gain:0.32,duration:0.65,output:p});
     tone({at:t+0.20,freq:587.33,gain:0.31,duration:0.68,output:p});
     tone({at:t+0.41,freq:783.99,gain:0.29,duration:0.78,output:p});
@@ -464,7 +531,7 @@
     function startStick(id,x,y) {
       if(control.pointer!==null||game.won)return;
       control.pointer=id;
-      if(control===controls.look)control.baseYaw=player.yaw;
+      if(control===controls.look||control===controls.move)control.baseYaw=player.yaw;
       const rect=zone.getBoundingClientRect();
       control.cx=x;control.cy=y;
       joy.style.left=`${x-rect.left}px`;
@@ -483,7 +550,7 @@
       control.x=ox/JOY_RANGE;control.y=oy/JOY_RANGE;
       // Обновляем ориентацию только при фактическом перемещении пальца.
       // При отпускании последний угол остаётся; следующее касание берёт его за основу.
-      if(control===controls.look && len>=LOOK_DEAD_ZONE) {
+      if(control===controls.look && len>=LOOK_DEAD_ZONE && Math.hypot(controls.move.x,controls.move.y)<=MOVE_DEAD_ZONE) {
         const relativeAngle=Math.atan2(ox,-oy);
         player.yaw=wrapYaw(control.baseYaw+relativeAngle);
       }
@@ -545,7 +612,7 @@
     player.x=start.x;player.z=start.z;player.yaw=SPAWN.yaw;
     game.steps=0;game.distance=0;game.stepAccum=0;game.startedAt=audio?performance.now():null;
     game.won=false;game.lastBump=-Infinity;
-    pressed.clear();releaseAll();el.winOverlay.classList.remove('visible');
+    pressed.clear();releaseAll();keyboardMoveBase=null;el.winOverlay.classList.remove('visible');
     if(audio) {
       const t=audio.ctx.currentTime;
       nextSound={water:t+0.3,metal:t+1.1,exit:t+1.8};
@@ -606,16 +673,20 @@
       if(pressed.has('KeyS')||pressed.has('ArrowDown'))my+=1;
       if(pressed.has('KeyA'))mx-=1;
       if(pressed.has('KeyD'))mx+=1;
-      mx=Math.max(-1,Math.min(1,mx));my=Math.max(-1,Math.min(1,my));
-      // Нет диагонального хода: в каждый момент только одна локальная ось.
-      const forward=-my;
-      const strafe=mx;
-      const axis=Math.abs(forward)>=Math.abs(strafe)?'forward':'strafe';
-      const intensity=axis==='forward'?forward:strafe;
-      if(Math.abs(intensity)>0.13) {
-        const speed=MOVE_SPEED*Math.sign(intensity)*(Math.abs(intensity)-0.13)/0.87;
-        const dx=(axis==='forward'?Math.sin(player.yaw):Math.cos(player.y))*speed*dt;
-        const dz=(axis==='forward'?-Math.cos(player.yaw):Math.sin(player.yaw))*speed*dt;
+      // Базовый угол берём в начале жеста, иначе авторазворот камеры
+      // будет повторно поворачивать тот же вектор и персонаж пойдёт по кругу.
+      const keysMoving=pressed.has('KeyW')||pressed.has('ArrowUp')||pressed.has('KeyS')||pressed.has('ArrowDown')||pressed.has('KeyA')||pressed.has('KeyD');
+      if(!keysMoving)keyboardMoveBase=null;
+      else if(keyboardMoveBase===null)keyboardMoveBase=player.yaw;
+      const base=controls.move.pointer!==null?controls.move.baseYaw:(keyboardMoveBase??player.yaw);
+      const magnitude=Math.min(1,Math.hypot(mx,my));
+      if(magnitude>MOVE_DEAD_ZONE) {
+        const speed=MOVE_SPEED*(magnitude-MOVE_DEAD_ZONE)/(1-MOVE_DEAD_ZONE);
+        const direction=wrapYaw(base+Math.atan2(mx,-my));
+        // Камера всегда смотрит в сторону фактического направления шага.
+        player.yaw=direction;
+        const dx=Math.sin(direction)*speed*dt;
+        const dz=-Math.cos(direction)*speed*dt;
         moveBy(dx,dz);
         checkWin();
       }
@@ -627,7 +698,7 @@
     requestAnimationFrame(frame);
   }
   renderAudioStatus();
-  el.message.textContent='Игра готова. Поворот: веди палец вверх (прямо), вправо (90°), вниз (назад), влево (-90°). Отпусти — направление сохранится. Новое касание повернёт от текущего угла.';
+  el.message.textContent='Версия 4: джойстик движения задаёт любую траекторию и сразу поворачивает взгляд. Второй джойстик поворачивает на месте. По карте можно проверить ориентацию. Слушай воду, механизм и радиопомехи.';
   requestAnimationFrame(frame);
   // Удобный, только для отладки интерфейс в DevTools, не влияет на игровой UI.
   window.DarkMaze3D={get state(){return {x:player.x,z:player.z,yaw:player.yaw,steps:game.steps,distance:game.distance,won:game.won,audioState:audio?.ctx.state??"not initialized",muted:mute,level:MAZE.map(s=>s)};},reset,showMap:()=>el.mapBtn.click()};
