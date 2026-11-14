@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#030405" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>DarkMaze2D — слуховой лабиринт</title>
+  <style>
+    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --ink:#e7ebed; --muted:#777f87; --soft:#1b2025; --edge:#24292d; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    html,body { height:100%; margin:0; background:#030405; color:var(--ink); overflow:hidden; }
+    body { overscroll-behavior:none; user-select:none; -webkit-user-select:none; }
+    button { color:inherit; font:inherit; cursor:pointer; }
+    #game { position:fixed; inset:0; height:100dvh; background:#030405; touch-action:none; overflow:hidden; }
+    #field { position:absolute; inset:0; touch-action:none; }
+    #field:focus { outline:none; }
+    #map { display:none; position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+    #map.debug { display:block; }
+    #hud { position:absolute; inset:0; pointer-events:none; }
+    .top { position:absolute; top:calc(14px + env(safe-area-inset-top)); left:17px; right:17px; display:flex;
+      justify-content:space-between; align-items:flex-start; gap:14px; }
+    .brand { font-size:12px; font-weight:700; letter-spacing:0.16em; color:#7f8b97; }
+    .metric { font:12px/1.8 ui-monospace, SFMono-Regular, Menlo, monospace; color:#71808a; }
+    .stat { font:12px/1.8 ui-monospace, SFMono-Regular, Menlo, monospace; text-align:right; color:#66717a; }
+    #game:not(.debug-mode) .stat { opacity:0; }
+    .foot { position:absolute; bottom:calc(16px + env(safe-area-inset-bottom)); left:14px; right:14px;
+      display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px; pointer-events:auto; }
+    .chip { border:1px solid #252c33; background:rgba(20,24,28,.85); border-radius:11px;
+      padding:10px 11px; font-size:12px; color:#bac3cb; min-height:38px; }
+    .chip:active { background:#353d44; }
+    .chip.active { color:#e3cfa8; border-color:#745b38; }
+    #status { position:absolute; bottom:calc(73px + env(safe-area-inset-bottom)); left:16px; right:16px;
+      text-align:center; font-size:12px; letter-spacing:.02em; color:#6b7781; transition:opacity .3s; }
+    .joystick { position:absolute; left:0; top:0; width:130px; height:130px; transform:translate(-50%,-50%);
+      display:none; pointer-events:none; opacity:0.75; }
+    .joystick.show { display:block; }
+    .joystick .ring { position:absolute; width:108px; height:108px; border:1px solid #48545e;
+      background:radial-gradient(circle,rgba(32,43,52,.2),rgba(10,13,16,.1)); border-radius:50%; left:11px; top:11px; }
+    .joystick .knob { position:absolute; left:65px; top:65px; width:31px; height:31px;
+      border:1px solid #adb8c0; border-radius:50%; background:#66717d; transform:translate(-50%,-50%); }
+    .overlay { position:absolute; inset:0; display:grid; place-items:center;
+      background:rgba(3,4,5,.96); z-index:10; padding:25px; }
+    .overlay.hidden { display:none; }
+    .dialog { width:min(100%,420px); text-align:center; }
+    h1 { margin:0 0 10px; font-size:clamp(26px,7vw,35px); letter-spacing:.08em; font-weight:650; }
+    .eyebrow { font:11px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.2em;
+      color:#87929c; margin-bottom:12px; }
+    .lead { color:#bac0c5; line-height:1.65; font-size:14px; margin:14px auto 23px; max-width:360px; }
+    .detail { color:#7b858d; line-height:1.7; font-size:13px; max-width:370px; margin:0 auto 24px; }
+    .primary { width:100%; padding:16px 24px; border:1px solid #9eafbb; border-radius:13px;
+      color:#0b1014; background:#dce7ed; font-size:16px; font-weight:650; }
+    .secondary { margin-top:10px; width:100%; padding:12px 24px; border:1px solid #2c3339; border-radius:13px;
+      color:#bbc4c9; background:transparent; font-size:14px; }
+    .hint { margin-top:20px; color:#5c6870; font-size:12px; line-height:1.6; }
+    #toast { position:absolute; top:calc(74px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+      white-space:nowrap; font-size:12px; color:#bbd1df; background:#1b242a; border-radius:8px;
+      padding:9px 14px; opacity:0; transition:opacity .2s; pointer-events:none; }
+    #toast.show { opacity:1; }
+    @media (max-height:600px) { .foot { bottom:10px; } #status { bottom:61px; } .top { top:10px; } .hint { margin-top:10px; } }
+    @media (prefers-reduced-motion:reduce) { *,*:before,*:after { transition:none !important; } }
+  </style>
+</head>
+<body>
+<div id="game">
+  <div id="field" role="application" aria-label="Слуховой лабиринт. Управление касанием или клавишами WASD и стрелками." tabindex="0">
+    <canvas id="map" aria-hidden="true"></canvas>
+    <div class="joystick" id="joy" aria-hidden="true"><div class="ring"></div><div class="knob" id="knob"></div></div>
+  </div>
+  <div id="hud">
+    <div class="top">
+      <div><div class="brand">DARKMAZE2D</div><div class="metric" id="levelText">Лабиринт 01</div></div>
+      <div class="stat"><div id="stepsText">ШАГИ 000</div><div id="sightText">ЗВУК: ПРЯМАЯ ВИДИМОСТЬ</div></div>
+    </div>
+    <div id="status">Найди выход на слух</div>
+    <div class="foot">
+      <button class="chip" id="soundBtn" type="button">◖)) Звук</button>
+      <button class="chip" id="mapBtn" type="button">⌗ Карта: выкл</button>
+      <button class="chip" id="resetBtn" type="button">↻ Заново</button>
+      <button class="chip" id="helpBtn" type="button">? Правила</button>
+    </div>
+  </div>
+  <div id="toast" aria-live="polite"></div>
+  <div class="overlay" id="startOverlay">
+    <div class="dialog">
+      <div class="eyebrow">АУДИОИГРА · ПРОТОТИП 01</div>
+      <h1>DarkMaze2D</h1>
+      <div class="lead">Ты в полной темноте. Почувствуй ширину коридоров, считай шаги, ищи выход по звуку.</div>
+      <div class="detail">Коснись экрана в любой точке и веди палец: там появится джойстик. Движение только по четырём направлениям. У стен — удар и вибрация, если устройство её поддерживает. Маяки слышны только поблизости и по прямой видимости.</div>
+      <button class="primary" id="startBtn" type="button">Начать в наушниках</button>
+      <div class="hint">На компьютере: WASD / стрелки. Карта по умолчанию скрыта.<br>Звук браузер разрешит после нажатия кнопки.</div>
+    </div>
+  </div>
+  <div class="overlay hidden" id="helpOverlay">
+    <div class="dialog">
+      <div class="eyebrow">ПРАВИЛА</div>
+      <h1>Слушай пространство</h1>
+      <div class="detail">Каждый шаг звучит после одного диаметра персонажа <strong>реально пройденного пути</strong>. Коридоры шириной в три диаметра — можно сместиться к стене и снова найти середину.<br><br>Тупики содержат разные звуковые маяки. Они слышны лишь на небольшом расстоянии, пока прямая между тобой и источником не пересекает стену. Выход подаёт узнаваемый тройной сигнал. Двигайся за ним и пройди сквозь проём наружу.<br><br>Отладочная карта нужна только для проверки механики.</div>
+      <button class="primary" id="helpClose" type="button">Продолжить</button>
+    </div>
+  </div>
+  <div class="overlay hidden" id="winOverlay">
+    <div class="dialog">
+      <div class="eyebrow">ВЫХОД НАЙДЕН</div>
+      <h1>Ты выбрался</h1>
+      <div class="lead" id="winStats"></div>
+      <button class="primary" id="nextBtn" type="button">Следующий лабиринт</button>
+      <button class="secondary" id="retryBtn" type="button">Повторить этот</button>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const el = {
+    field:$('field'), map:$('map'), joy:$('joy'),knob:$('knob'),
+    start:$('startOverlay'),help:$('helpOverlay'),win:$('winOverlay'),
+    startBtn:$('startBtn'),helpBtn:$('helpBtn'),helpClose:$('helpClose'),
+    next:$('nextBtn'),retry:$('retryBtn'),resetBtn:$('resetBtn'),
+    mapBtn:$('mapBtn'),soundBtn:$('soundBtn'),
+    level:$('levelText'),steps:$('stepsText'),sight:$('sightText'),
+    status:$('status'),toast:$('toast'),winStats:$('winStats')
+  };
+  const TILE=4;                  // 3 walkable diameters and 1 diameter wall between cells
+  const PLAYER_R=0.5;             // diameter exactly 1 map unit
+  const STEP_DISTANCE=1;          // one sound = one diameter of ACTUAL travelled distance
+  const PLAYER_SPEED=2.7;         // map units/s
+  const BEACON_RADIUS=7.2;        // in hero diameters; walls fully occlude the signal
+  const JOY_RADIUS=53;
+  const dirs=[{dx:1,dy:0,opp:2},{dx:0,dy:1,opp:3},{dx:-1,dy:0,opp:0},{dx:0,dy:-1,opp:1}];
+  let stage=1,maze,player,beacons=[],steps=0,stepRemainder=0,moving=false,won=false,playing=false,debug=false;
+  let input={dx:0,dy:0,power:0},face={dx:1,dy:0},lastCollision=0,elapsed=0,frameTime=0;
+  let touchId=null,touchBase={x:0,y:0},keys=[];
+  let toastUntil=0;
+
+  function randInt(n){return Math.floor(Math.random()*n);}
+  function buildMaze(cols,rows) {
+    // Cell-level randomized depth-first spanning tree (every cell is reachable).
+    const cells=Array.from({length:cols*rows},()=>({links:[false,false,false,false],seen:false}));
+    const idx=(x,y)=>y*cols+x;
+    const stack=[0]; cells[0].seen=true;
+    while(stack.length){
+      const cur=stack[stack.length-1],cx=cur%cols,cy=Math.floor(cur/cols);
+      const options=[];
+      for(let d=0;d<4;d++){
+        const nx=cx+dirs[d].dx,ny=cy+dirs[d].dy;
+        if(nx>=0&&ny>=0&&nx<cols&&ny<rows&&!cells[idx(nx,ny)].seen) options.push([d,idx(nx,ny)]);
+      }
+      if(!options.length){stack.pop();continue;}
+      const [d,next]=options[randInt(options.length)];
+      cells[cur].links[d]=true;cells[next].links[dirs[d].opp]=true;
+      cells[next].seen=true;stack.push(next);
+    }
+    const dist=Array(cols*rows).fill(-1); dist[0]=0;const queue=[0];
+    for(let k=0;k<queue.length;k++){
+      const c=queue[k],cx=c%cols,cy=Math.floor(c/cols);
+      for(let d=0;d<4;d++) if(cells[c].links[d]){
+        const nx=cx+dirs[d].dx,ny=cy+dirs[d].dy,ni=idx(nx,ny);
+        if(dist[ni]===-1){dist[ni]=dist[c]+1;queue.push(ni);}
+      }
+    }
+    // Long route: select farthest boundary cell from the starting point.
+    let goal=0;
+    for(let i=1;i<cells.length;i++){
+      const x=i%cols,y=Math.floor(i/cols);
+      if((x===0||y===0||x===cols-1||y===rows-1)&&dist[i]>dist[goal])goal=i;
+    }
+    const gx=goal%cols,gy=Math.floor(goal/cols);
+    const candidates=[];
+    if(gx===cols-1)candidates.push(0); if(gy===rows-1)candidates.push(1);
+    if(gx===0)candidates.push(2); if(gy===0)candidates.push(3);
+    const outDir=candidates[randInt(candidates.length)];
+    const w=cols*TILE+1,h=rows*TILE+1;
+    const walls=new Uint8Array(w*h);walls.fill(1);
+    const carve=(x,y)=>{walls[y*w+x]=0;};
+    for(let cy=0;cy<rows;cy++)for(let cx=0;cx<cols;cx++){
+      for(let dy=1;dy<=3;dy++)for(let dx=1;dx<=3;dx++)carve(cx*TILE+dx,cy*TILE+dy);
+      const cell=cells[idx(cx,cy)];
+      if(cell.links[0])for(let dy=1;dy<=3;dy++)carve(cx*TILE+4,cy*TILE+dy);
+      if(cell.links[1])for(let dx=1;dx<=3;dx++)carve(cx*TILE+dx,cy*TILE+4);
+    }
+    const exit={cell:goal,dir:outDir,x:gx*TILE+2.5,y:gy*TILE+2.5};
+    if(outDir===0){exit.x=w-0.5;for(let dy=1;dy<=3;dy++)carve(w-1,gy*TILE+dy);}
+    if(outDir===1){exit.y=h-0.5;for(let dx=1;dx<=3;dx++)carve(gx*TILE+dx,h-1);}
+    if(outDir===2){exit.x=0.5;for(let dy=1;dy<=3;dy++)carve(0,gy*TILE+dy);}
+    if(outDir===3){exit.y=0.5;for(let dx=1;dx<=3;dx++)carve(gx*TILE+dx,0);}
+    const ends=[];
+    for(let i=1;i<cells.length;i++){
+      const links=cells[i].links.filter(Boolean).length;
+      if(links===1&&i!==goal)ends.push({x:(i%cols)*TILE+2.5,y:Math.floor(i/cols)*TILE+2.5,kind:(i+ends.length)%4});
+    }
+    return {cols,rows,w,h,walls,cells,exit,ends,distance:dist[goal]};
+  }
+
+  function solidTile(tx,ty){
+    if(tx>=0&&ty>=0&&tx<maze.w&&ty<maze.h) return maze.walls[ty*maze.w+tx]!==0;
+    // The only legal exterior is the 3-diameter-wide lane through the exit.
+    const e=maze.exit;
+    if(e.dir===0&&tx>=maze.w&&ty>=0&&ty<maze.h) return Math.abs(ty+0.5-e.y)>1.01;
+    if(e.dir===2&&tx<0&&ty>=0&&ty<maze.h) return Math.abs(ty+0.5-e.y)>1.01;
+    if(e.dir===1&&ty>=maze.h&&tx>=0&&tx<maze.w) return Math.abs(tx+0.5-e.x)>1.01;
+    if(e.dir===3&&ty<0&&tx>=0&&tx<maze.w) return Math.abs(tx+0.5-e.x)>1.01;
+    return true;
+  }
+  function canOccupy(x,y){
+    const r=PLAYER_R;
+    for(let ty=Math.floor(y-r);ty<=Math.floor(y+r);ty++)
+      for(let tx=Math.floor(x-r);tx<=Math.floor(x+r);tx++){
+        if(!solidTile(tx,ty))continue;
+        const nx=Math.max(tx,Math.min(x,tx+1));
+        const ny=Math.max(ty,Math.min(y,ty+1));
+        if((x-nx)*(x-nx)+(y-ny)*(y-ny)<r*r-0.00001)return false;
+      }
+    return true;
+  }
+  function visible(a,b){
+    const dx=b.x-a.x,dy=b.y-a.y;
+    const count=Math.max(1,Math.ceil(Math.hypot(dx,dy)/0.12));
+    for(let i=1;i<count;i++){
+      const x=a.x+dx*i/count,y=a.y+dy*i/count;
+      if(solidTile(Math.floor(x),Math.floor(y)))return false;
+    }
+    return true;
+  }
+  function startStage(newMap=true){
+    const size=Math.min(5+Math.floor((stage-1)/2),10);
+    if(newMap||!maze)maze=buildMaze(size,size);
+    player={x:2.5,y:2.5};face={dx:1,dy:0};
+    steps=0;stepRemainder=0;elapsed=0;lastCollision=0;
+    won=false;playing=true;moving=false;
+    input={dx:0,dy:0,power:0};keys=[];
+    releaseTouch();
+    beacons=maze.ends.map((b,i)=>({...b,id:i,nextSound:0,gain:null,pan:null,level:0}));
+    beacons.push({x:maze.exit.x,y:maze.exit.y,kind:4,id:beacons.length,nextSound:0,gain:null,pan:null,level:0});
+    if(audio.ctx)audio.initBeacons();
+    el.level.textContent=`Лабиринт ${String(stage).padStart(2,'0')}`;
+    el.steps.textContent='ШАГИ 000';
+    el.status.textContent='Найди выход на слух';
+    el.win.classList.add('hidden');
+    el.start.classList.add('hidden');
+    el.help.classList.add('hidden');
+    frameTime=performance.now();
+  }
+  function showToast(msg){el.toast.textContent=msg;el.toast.classList.add('show');toastUntil=performance.now()+1500;}
+  function collided(now){
+    if(now-lastCollision<550)return;
+    lastCollision=now;
+    audio.bump();
+    // iOS Safari normally lacks navigator.vibrate; a sound always remains as fallback.
+    try { if(typeof navigator.vibrate==='function')navigator.vibrate(28); } catch(_) {}
+  }
+  function reachedExit(){
+    const e=maze.exit;
+    return (e.dir===0&&player.x>maze.w+.45)
+      ||(e.dir===1&&player.y>maze.h+.45)
+      ||(e.dir===2&&player.x<-.45)
+      ||(e.dir===3&&player.y<-.45);
+  }
+  function win(){
+    if(won)return;
+    won=true;playing=false;input.power=0;
+    releaseTouch();
+    audio.stopBeacons();
+    audio.victory();
+    el.winStats.textContent=`Лабиринт ${stage} · ${steps} шагов · ${Math.round(elapsed)} сек. Настоящие шаги — это путь, а не проигрываемая по таймеру анимация.`;
+    el.win.classList.remove('hidden');
+  }
+  function advance(dt,now){
+    if(!playing||el.help.classList.contains('hidden')===false)return;
+    const keyDirection=dirFromKeys();
+    const drive=keyDirection||input;
+    if(drive.power<=0){moving=false;return;}
+    face={dx:drive.dx,dy:drive.dy};
+    const distance=PLAYER_SPEED*drive.power*dt;
+    const count=Math.max(1,Math.ceil(distance/0.06));
+    const small=distance/count;
+    let actual=0,hit=false;
+    for(let i=0;i<count;i++){
+      const xx=player.x+drive.dx*small,yy=player.y+drive.dy*small;
+      if(canOccupy(xx,yy)){
+        actual+=Math.hypot(xx-player.x,yy-player.y);
+        player.x=xx;player.y=yy;
+      }else{
+        // Resolve contact to the actual wall surface, not a whole simulation substep early.
+        // This matters: wall → corridor centre is exactly one stride by design.
+        let lo=0,hi=small;
+        for(let j=0;j<12;j++){
+          const mid=(lo+hi)*.5;
+          if(canOccupy(player.x+drive.dx*mid,player.y+drive.dy*mid))lo=mid;
+          else hi=mid;
+        }
+        if(lo>0){player.x+=drive.dx*lo;player.y+=drive.dy*lo;actual+=lo;}
+        hit=true;break;
+      }
+      if(reachedExit()) { win(); break; }
+    }
+    if(actual>0){
+      stepRemainder+=actual;
+      while(stepRemainder+1e-9>=STEP_DISTANCE){
+        stepRemainder-=STEP_DISTANCE;
+        steps++;
+        audio.step(steps);
+      }
+      el.steps.textContent=`ШАГИ ${String(steps).padStart(3,'0')}`;
+    }
+    if(hit)collided(now);
+    moving=actual>0;
+  }
+  function dirFromKeys(){
+    if(!keys.length)return null;
+    const key=keys[keys.length-1];
+    const mapping={ArrowUp:[0,-1],KeyW:[0,-1],ArrowDown:[0,1],KeyS:[0,1],ArrowLeft:[-1,0],KeyA:[-1,0],ArrowRight:[1,0],KeyD:[1,0]};
+    const vec=mapping[key];return vec?{dx:vec[0],dy:vec[1],power:1}:null;
+  }
+  window.addEventListener('keydown',e=>{
+    if(/^(ArrowUp|ArrowDown|ArrowLeft|ArrowRight|KeyW|KeyA|KeyS|KeyD)$/.test(e.code)){
+      e.preventDefault();if(!keys.includes(e.code))keys.push(e.code);
+    }
+    if(e.code==='KeyM'&&playing)toggleMap();
+  });
+  window.addEventListener('keyup',e=>{keys=keys.filter(k=>k!==e.code);});
+  window.addEventListener('blur',()=>{keys=[];input.power=0;releaseTouch();});
+
+  function releaseTouch(){
+    touchId=null;input={dx:0,dy:0,power:0};
+    el.joy.classList.remove('show');
+  }
+  el.field.addEventListener('pointerdown',e=>{
+    if(!playing||touchId!==null)return;
+    if(e.pointerType==='mouse'&&e.button!==0)return;
+    e.preventDefault();
+    touchId=e.pointerId;touchBase={x:e.clientX,y:e.clientY};
+    el.joy.style.left=`${touchBase.x}px`;el.joy.style.top=`${touchBase.y}px`;
+    el.knob.style.transform='translate(-50%,-50%)';
+    el.joy.classList.add('show');
+    try{el.field.setPointerCapture(e.pointerId);}catch(_){}
+    if(audio.ctx&&audio.ctx.state==='suspended')audio.ctx.resume().catch(()=>{});
+  });
+  el.field.addEventListener('pointermove',e=>{
+    if(e.pointerId!==touchId)return;
+    e.preventDefault();
+    const dx=e.clientX-touchBase.x,dy=e.clientY-touchBase.y;
+    const len=Math.hypot(dx,dy),factor=Math.min(1,JOY_RADIUS/Math.max(len,.001));
+    el.knob.style.transform=`translate(calc(-50% + ${Math.round(dx*factor)}px),calc(-50% + ${Math.round(dy*factor)}px))`;
+    if(len<12){input={dx:0,dy:0,power:0};return;}
+    const power=Math.min(1,(len-8)/38);
+    // Dominant-axis selection: diagonal movement is intentionally impossible.
+    // Hysteresis avoids rapid left/right vs up/down switching around 45 degrees.
+    const useX=input.power>0&&input.dx!==0 ? Math.abs(dx)>=Math.abs(dy)*.85
+      : input.power>0&&input.dy!==0 ? Math.abs(dx)>Math.abs(dy)*1.15
+      : Math.abs(dx)>=Math.abs(dy);
+    input=useX ?{dx:Math.sign(dx),dy:0,power}
+      :{dx:0,dy:Math.sign(dy),power};
+  });
+  ['pointerup','pointercancel','lostpointercapture'].forEach(type=>el.field.addEventListener(type,e=>{
+    if(e.pointerId===touchId)releaseTouch();
+  }));
+  // Controls deliberately keep pointer events separate from the touchable playfield.
+  function toggleMap(){debug=!debug;$('game').classList.toggle('debug-mode',debug);el.map.classList.toggle('debug',debug);el.mapBtn.classList.toggle('active',debug);el.mapBtn.textContent=debug?'⌗ Карта: вкл':'⌗ Карта: выкл';}
+  el.mapBtn.addEventListener('click',toggleMap);
+  el.soundBtn.addEventListener('click',()=>{
+    audio.muted=!audio.muted;audio.refreshMute();
+    el.soundBtn.textContent=audio.muted?'× Без звука':'◖)) Звук';
+    el.soundBtn.classList.toggle('active',audio.muted);
+  });
+  el.resetBtn.addEventListener('click',()=>{if(!audio.ctx){return;}startStage(false);showToast('Повтор этого лабиринта');});
+  el.helpBtn.addEventListener('click',()=>{if(!audio.ctx)return;el.help.classList.remove('hidden');input.power=0;releaseTouch();});
+  el.helpClose.addEventListener('click',()=>{el.help.classList.add('hidden');el.field.focus();});
+  el.next.addEventListener('click',()=>{stage++;startStage();});
+  el.retry.addEventListener('click',()=>{startStage(false);});
+  // Start gameplay synchronously on the button tap. In some WebKit previews
+  // AudioContext.resume() may remain pending; it must never block the Start UI.
+  el.startBtn.addEventListener('click',()=>{
+    try {
+      const unlocking=audio.unlock();
+      startStage();el.field.focus();
+      Promise.resolve(unlocking).catch(err=>{
+        console.warn('Audio unavailable',err);
+        showToast('Звук не доступен в этом браузере');
+      });
+    } catch(err) {
+      console.warn('Audio unavailable',err);
+      startStage();el.field.focus();
+      showToast('Звук не доступен в этом браузере');
+    }
+  });
+
+  const audio={
+    ctx:null,master:null,ambient:null,noise:null,muted:false,
+    async unlock(){
+      if(!this.ctx){
+        const AudioCtx=window.AudioContext||window.webkitAudioContext;
+        if(!AudioCtx)throw new Error('Web Audio API not supported');
+        this.ctx=new AudioCtx();
+        this.master=this.ctx.createGain();this.master.gain.value=1;
+        this.master.connect(this.ctx.destination);
+        const buffer=this.ctx.createBuffer(1,Math.round(this.ctx.sampleRate*.18),this.ctx.sampleRate);
+        const data=buffer.getChannelData(0);
+        for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/data.length,1.5);
+        this.noise=buffer;
+        this.createAmbient();
+      }
+      await this.ctx.resume();
+      this.refreshMute();
+    },
+    refreshMute(){
+      if(this.master&&this.ctx)this.master.gain.setTargetAtTime(this.muted?0:1,this.ctx.currentTime,.025);
+    },
+    createAmbient(){
+      // Quiet, deliberately persistent air texture: the player never sits in absolute silence.
+      const c=this.ctx;
+      const length=c.sampleRate*2,buffer=c.createBuffer(1,length,c.sampleRate);
+      const d=buffer.getChannelData(0);
+      let v=0;
+      for(let i=0;i<length;i++){v=.975*v+.025*(Math.random()*2-1);d[i]=v;}
+      const s=c.createBufferSource();s.buffer=buffer;s.loop=true;
+      const filter=c.createBiquadFilter();filter.type='lowpass';filter.frequency.value=440;
+      const g=c.createGain();g.gain.value=.075;
+      s.connect(filter);filter.connect(g);g.connect(this.master);s.start();
+      // Soft low drone, just enough to provide a stable background.
+      const osc=c.createOscillator();osc.type='sine';osc.frequency.value=61;
+      const og=c.createGain();og.gain.value=.009;
+      osc.connect(og);og.connect(this.master);osc.start();
+      this.ambient={s,osc};
+    },
+    stopBeacons(){
+      if(!this.ctx)return;
+      for(const b of beacons){if(b.gain)b.gain.gain.setTargetAtTime(0,this.ctx.currentTime,.025);}
+    },
+    initBeacons(){
+      // Disconnect previous stage's nodes. Ongoing short notes end naturally.
+      if(this.sources)for(const s of this.sources)try{s.gain.disconnect();s.pan.disconnect();}catch(_){}
+      this.sources=[];
+      for(const b of beacons){
+        const c=this.ctx;
+        b.gain=c.createGain();b.gain.gain.value=0;
+        b.pan=c.createStereoPanner?c.createStereoPanner():c.createGain();
+        b.gain.connect(b.pan);b.pan.connect(this.master);
+        b.level=0;b.nextSound=c.currentTime+.15+Math.random()*.7;
+        this.sources.push(b);
+      }
+    },
+    tone(frequency,start,duration,peak,type,destination,lowFreq){
+      const c=this.ctx;
+      const osc=c.createOscillator();osc.type=type||'sine';
+      osc.frequency.setValueAtTime(frequency,start);
+      if(lowFreq)osc.frequency.exponentialRampToValueAtTime(lowFreq,start+duration);
+      const g=c.createGain();g.gain.setValueAtTime(.0001,start);
+      g.gain.exponentialRampToValueAtTime(Math.max(.0002,peak),start+.012);
+      g.gain.exponentialRampToValueAtTime(.0001,start+duration);
+      osc.connect(g);g.connect(destination);osc.start(start);osc.stop(start+duration+.015);
+    },
+    sample(start,volume,filterFreq,output){
+      const c=this.ctx,s=c.createBufferSource();s.buffer=this.noise;
+      const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=filterFreq;
+      const g=c.createGain();g.gain.value=volume;
+      s.connect(f);f.connect(g);g.connect(output||this.master);
+      s.start(start);s.stop(start+.18);
+    },
+    step(n){
+      if(!this.ctx)return;
+      const t=this.ctx.currentTime;
+      this.sample(t,n%2===0?.11:.094,n%2===0?950:1250);
+      this.tone(n%2===0?87:94,t,.105,.057,'sine',this.master,51);
+    },
+    bump(){
+      if(!this.ctx)return;
+      const t=this.ctx.currentTime;
+      this.sample(t,.15,380);
+      this.tone(170,t,.12,.15,'triangle',this.master,75);
+    },
+    victory(){
+      if(!this.ctx)return;
+      const t=this.ctx.currentTime;
+      [523,659,784,1047].forEach((f,i)=>this.tone(f,t+i*.15,.42,.14,'sine',this.master));
+    },
+    beaconNote(b,t){
+      // Five distinctly patterned families: water, hum, double tick, metallic ping, exit triad.
+      // Notes are routed through per-beacon gain and stereo pan.
+      const out=b.gain;
+      switch(b.kind){
+        case 0: this.tone(740,t,.27,.5,'sine',out,480);b.nextSound=t+1.55;break;
+        case 1: this.tone(205,t,.58,.35,'triangle',out,185);b.nextSound=t+1.7;break;
+        case 2: this.tone(570,t,.085,.55,'square',out);this.tone(395,t+.16,.10,.5,'square',out);b.nextSound=t+1.6;break;
+        case 3: this.tone(925,t,.5,.32,'sine',out,680);this.tone(1380,t,.28,.2,'sine',out);b.nextSound=t+2.1;break;
+        case 4: [622,830,988].forEach((f,i)=>this.tone(f,t+i*.17,.30,.75,'sine',out));b.nextSound=t+2.2;break;
+      }
+    },
+    update(){
+      if(!this.ctx||!beacons.length||!playing||!maze)return;
+      const now=this.ctx.currentTime;
+      let audible=0;
+      for(const b of beacons){
+        const dx=b.x-player.x,dy=b.y-player.y,distance=Math.hypot(dx,dy);
+        const heard=distance<BEACON_RADIUS&&visible(player,b);
+        // Smooth distance roll-off, strict zero outside radius or behind walls.
+        const proximity=heard?Math.pow(Math.max(0,1-distance/BEACON_RADIUS),1.65):0;
+        const rear=(dx*face.dx+dy*face.dy)<0?.82:1;
+        b.level=proximity*rear;
+        b.gain.gain.setTargetAtTime(b.level,now,heard?.060:.015);
+        if('pan' in b.pan){
+          const right=(-face.dy*dx+face.dx*dy)/Math.max(.001,distance);
+          b.pan.pan.setTargetAtTime(Math.max(-1,Math.min(1,right)),now,.045);
+        }
+        if(b.level>.013)audible++;
+        if(now>=b.nextSound){
+          if(b.level>.005)this.beaconNote(b,now+.015);
+          else b.nextSound=now+.15; // start promptly if a beacon comes into sight
+        }
+      }
+      el.sight.textContent=`МАЯКОВ РЯДОМ: ${audible}`;
+    }
+  };
+  function drawMap(){
+    if(!debug)return;
+    const ctx=el.map.getContext('2d');
+    const dpr=Math.min(2,window.devicePixelRatio||1),w=el.map.clientWidth,h=el.map.clientHeight;
+    if(el.map.width!==Math.round(w*dpr)||el.map.height!==Math.round(h*dpr)){
+      el.map.width=Math.round(w*dpr);el.map.height=Math.round(h*dpr);
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+    ctx.fillStyle='#030405';ctx.fillRect(0,0,w,h);
+    const usableHeight=Math.max(100,h-173);
+    const scale=Math.min((w-26)/maze.w,usableHeight/maze.h);
+    const ox=(w-maze.w*scale)/2,oy=Math.max(70,(h-maze.h*scale)/2-16);
+    ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
+    ctx.fillStyle='#0b1014';ctx.fillRect(0,0,maze.w,maze.h);
+    ctx.fillStyle='#394147';
+    for(let y=0;y<maze.h;y++)for(let x=0;x<maze.w;x++){
+      if(maze.walls[y*maze.w+x])ctx.fillRect(x,y,1.013,1.013);
+    }
+    // Audible radius and LOS lines are only visible in the developer map.
+    ctx.strokeStyle='rgba(98,150,172,.22)';ctx.lineWidth=.09;
+    ctx.beginPath();ctx.arc(player.x,player.y,BEACON_RADIUS,0,Math.PI*2);ctx.stroke();
+    for(const b of beacons){
+      const d=Math.hypot(b.x-player.x,b.y-player.y),see=d<BEACON_RADIUS&&visible(player,b);
+      if(see){ctx.strokeStyle=b.kind===4?'rgba(246,206,110,.75)':'rgba(120,192,215,.4)';ctx.lineWidth=.07;
+        ctx.beginPath();ctx.moveTo(player.x,player.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
+      ctx.beginPath();ctx.arc(b.x,b.y,b.kind===4?.39:.23,0,Math.PI*2);
+      ctx.fillStyle=b.kind===4?'#f8d46e':['#69a2c1','#b995d8','#7eb5a2','#d68e81'][b.kind];ctx.fill();
+    }
+    const e=maze.exit;
+    ctx.strokeStyle='#f8d46e';ctx.lineWidth=.30;
+    ctx.beginPath();ctx.arc(e.x,e.y,.65,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='#e5f6ff';ctx.beginPath();ctx.arc(player.x,player.y,PLAYER_R,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#71d7ff';ctx.lineWidth=.13;ctx.beginPath();ctx.moveTo(player.x,player.y);
+    ctx.lineTo(player.x+face.dx*.96,player.y+face.dy*.96);ctx.stroke();
+    ctx.restore();
+  }
+  function loop(now){
+    const dt=Math.max(0,Math.min(.045,(now-frameTime)/1000||0));frameTime=now;
+    if(playing){
+      if(el.help.classList.contains('hidden')){elapsed+=dt;advance(dt,now);audio.update();}
+      drawMap();
+    }
+    if(toastUntil&&now>toastUntil){el.toast.classList.remove('show');toastUntil=0;}
+    requestAnimationFrame(loop);
+  }
+  // The maze is built locally — no network, accounts or telemetry.
+  requestAnimationFrame(t=>{frameTime=t;requestAnimationFrame(loop);});
+})();
+</script>
+</body>
+</html>
